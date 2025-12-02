@@ -22,6 +22,8 @@ A comprehensive full-stack application for migrating data from Oracle databases 
 
 This tool provides a complete solution for migrating Oracle databases to PostgreSQL, featuring:
 
+![Dashboard Overview](images/1_dashboard.png)
+
 - **Visual Table Mapping**: Discover and map tables with an intuitive interface
 - **Real-time Migration**: Monitor progress with live updates and detailed logs
 - **Advanced Data Type Handling**: Automatic conversion of Oracle types to PostgreSQL equivalents
@@ -542,6 +544,74 @@ Edit `docker-compose.yml` to customize:
    ```
 
 ## 📖 Usage Guide
+
+### Application Screenshots
+
+#### 1. Dashboard
+The dashboard provides an overview of your migration project with real-time statistics, connection status, and migration progress.
+
+![Dashboard](images/1_dashboard.png)
+
+**Key Features:**
+- Project information and status indicator
+- Source (Oracle) and Target (PostgreSQL) connection status cards
+- Migration progress overview with visual progress bars
+- Statistics cards showing total, mapped, migrated, and pending tables
+- Quick action cards for common tasks
+
+#### 2. Connection Configuration
+Configure your Oracle source and PostgreSQL target database connections with built-in connection testing functionality.
+
+![Connections](images/2_connetions.png)
+
+**Key Features:**
+- Separate forms for Source (Oracle) and Target (PostgreSQL) connections
+- Connection testing with real-time feedback
+- Support for custom schemas and connection strings
+- Secure password storage
+- Connection status indicators
+
+#### 3. Table Mapping
+Discover tables from your source database and map them to target tables with comprehensive column-level configuration options.
+
+![Table Mapping](images/3_table_mapping.png)
+
+**Key Features:**
+- Table discovery from source database
+- Visual source-to-target table mapping
+- Column-level mapping with data type display (including length/precision)
+- Select all/deselect all functionality
+- Edit capabilities for table and column names
+- Data type editing with length/precision controls
+- Filter conditions (WHERE clause) for source data
+- Drop/Truncate options before migration
+- Table status indicators (pending/mapped/migrated/error)
+
+#### 4. Data Type Rules
+View and understand the comprehensive automatic data type mappings from Oracle to PostgreSQL with detailed descriptions.
+
+![Data Type Rules](images/4_data_type.png)
+
+**Key Features:**
+- Complete data type mapping reference table
+- Oracle to PostgreSQL type conversions
+- Transformation hints and warnings
+- Search and filter functionality
+- Detailed descriptions for each mapping
+
+#### 5. Migration Execution
+Monitor migration progress in real-time with detailed logs, statistics, and progress tracking.
+
+![Migration Logs](images/5_migration_logs.png)
+
+**Key Features:**
+- Real-time migration status and duration
+- Table and row progress tracking with progress bars
+- Detailed migration logs with timestamps
+- Log level indicators (info/warning/error/success)
+- Export log functionality
+- Start/pause/resume migration controls
+- Statistics: tables completed, rows migrated, duration
 
 ### Getting Started
 
