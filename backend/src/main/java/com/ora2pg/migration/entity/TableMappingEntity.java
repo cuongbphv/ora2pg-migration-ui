@@ -36,6 +36,15 @@ public class TableMappingEntity {
     @Column(nullable = false)
     private String status = "pending"; // "pending", "mapped", "migrated", "error"
     
+    @Column(columnDefinition = "TEXT")
+    private String filterCondition; // WHERE clause for filtering source data
+    
+    @Column(nullable = false)
+    private Boolean dropBeforeInsert = false; // Drop table before migration
+    
+    @Column(nullable = false)
+    private Boolean truncateBeforeInsert = false; // Truncate table before migration
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
     private ProjectEntity project;

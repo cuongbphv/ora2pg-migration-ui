@@ -114,6 +114,9 @@ public class ProjectMapper {
         mapping.setTargetSchema(entity.getTargetSchema());
         mapping.setEnabled(entity.getEnabled());
         mapping.setStatus(entity.getStatus());
+        mapping.setFilterCondition(entity.getFilterCondition());
+        mapping.setDropBeforeInsert(entity.getDropBeforeInsert());
+        mapping.setTruncateBeforeInsert(entity.getTruncateBeforeInsert());
         
         if (entity.getColumnMappings() != null) {
             mapping.setColumnMappings(
@@ -137,6 +140,9 @@ public class ProjectMapper {
         entity.setTargetSchema(model.getTargetSchema());
         entity.setEnabled(model.getEnabled() != null ? model.getEnabled() : true);
         entity.setStatus(model.getStatus() != null ? model.getStatus() : "pending");
+        entity.setFilterCondition(model.getFilterCondition());
+        entity.setDropBeforeInsert(model.getDropBeforeInsert() != null ? model.getDropBeforeInsert() : false);
+        entity.setTruncateBeforeInsert(model.getTruncateBeforeInsert() != null ? model.getTruncateBeforeInsert() : false);
         entity.setProject(project);
         
         if (model.getColumnMappings() != null) {

@@ -29,6 +29,9 @@ public class MigrationService {
     @Autowired
     private ProjectRepository projectRepository;
     
+    @Autowired
+    private com.ora2pg.migration.repository.TableMappingRepository tableMappingRepository;
+    
     private final ConcurrentHashMap<String, MigrationProgress> progressMap = new ConcurrentHashMap<>();
     
     public MigrationProgress startMigration(Project project, AppSettings settings) {
@@ -64,10 +67,22 @@ public class MigrationService {
                 progress.setCurrentTable(tableMapping.getSourceTable());
                 addLog(progress, "info", "Migrating table: " + tableMapping.getSourceTable(), null);
                 
-                migrateTable(project, tableMapping, settings, progress);
-                
-                progress.setCompletedTables(progress.getCompletedTables() + 1);
-                addLog(progress, "success", "Completed table: " + tableMapping.getSourceTable(), null);
+                try {
+                    migrateTable(project, tableMapping, settings, progress);
+                    
+                    // Update table status to "migrated" after successful migration
+                    tableMapping.setStatus("migrated");
+                    updateTableMappingStatus(project.getId(), tableMapping.getId(), "migrated");
+                    
+                    progress.setCompletedTables(progress.getCompletedTables() + 1);
+                    addLog(progress, "success", "Completed table: " + tableMapping.getSourceTable(), null);
+                } catch (Exception e) {
+                    // Update table status to "error" if migration fails
+                    tableMapping.setStatus("error");
+                    updateTableMappingStatus(project.getId(), tableMapping.getId(), "error");
+                    addLog(progress, "error", "Failed to migrate table: " + tableMapping.getSourceTable() + " - " + e.getMessage(), e.toString());
+                    throw e; // Re-throw to stop migration
+                }
             }
             
             progress.setStatus("completed");
@@ -95,14 +110,38 @@ public class MigrationService {
                     String createTableSql = generateCreateTableSql(tableMapping);
                     
                     try (Statement stmt = targetConn.createStatement()) {
-                        // Drop table if exists (if truncateTarget is enabled)
-                        String dropSql = String.format("DROP TABLE IF EXISTS %s.%s CASCADE",
-                            tableMapping.getTargetSchema(), tableMapping.getTargetTable());
-                        stmt.execute(dropSql);
+                        // Handle drop/truncate based on table mapping settings
+                        if (tableMapping.getDropBeforeInsert() != null && tableMapping.getDropBeforeInsert()) {
+                            String dropSql = String.format("DROP TABLE IF EXISTS %s.%s CASCADE",
+                                quoteIdentifier(tableMapping.getTargetSchema()), 
+                                quoteIdentifier(tableMapping.getTargetTable()));
+                            stmt.execute(dropSql);
+                            addLog(progress, "info", "Dropped table: " + tableMapping.getTargetTable(), null);
+                        }
                         
-                        // Create table
-                        stmt.execute(createTableSql);
-                        addLog(progress, "info", "Created table: " + tableMapping.getTargetTable(), null);
+                        // Create table (only if it doesn't exist or was dropped)
+                        if (tableMapping.getDropBeforeInsert() == null || !tableMapping.getDropBeforeInsert()) {
+                            // Check if table exists
+                            String checkTableSql = String.format(
+                                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s')",
+                                tableMapping.getTargetSchema(), tableMapping.getTargetTable());
+                            boolean tableExists = false;
+                            try (var rs = stmt.executeQuery(checkTableSql)) {
+                                if (rs.next()) {
+                                    tableExists = rs.getBoolean(1);
+                                }
+                            }
+                            
+                            if (!tableExists) {
+                                stmt.execute(createTableSql);
+                                addLog(progress, "info", "Created table: " + tableMapping.getTargetTable(), null);
+                            } else {
+                                addLog(progress, "info", "Table already exists: " + tableMapping.getTargetTable(), null);
+                            }
+                        } else {
+                            stmt.execute(createTableSql);
+                            addLog(progress, "info", "Created table: " + tableMapping.getTargetTable(), null);
+                        }
                     }
                 }
                 
@@ -191,10 +230,22 @@ public class MigrationService {
                 selectCols.append(col.getSourceColumn());
             }
             
+            // Build SELECT query with optional filter condition
             String selectSql = String.format("SELECT %s FROM %s.%s",
                 selectCols.toString(),
-                tableMapping.getSourceSchema(),
-                tableMapping.getSourceTable());
+                quoteIdentifier(tableMapping.getSourceSchema()),
+                quoteIdentifier(tableMapping.getSourceTable()));
+            
+            // Add filter condition if specified
+            if (tableMapping.getFilterCondition() != null && !tableMapping.getFilterCondition().trim().isEmpty()) {
+                String filter = tableMapping.getFilterCondition().trim();
+                // Ensure it starts with WHERE if not already present
+                if (!filter.toUpperCase().startsWith("WHERE")) {
+                    selectSql += " WHERE " + filter;
+                } else {
+                    selectSql += " " + filter;
+                }
+            }
             
             // Build INSERT query
             StringBuilder insertCols = new StringBuilder();
@@ -208,9 +259,20 @@ public class MigrationService {
                 insertVals.append("?");
             }
             
+            // Handle truncate before insert if specified
+            if (tableMapping.getTruncateBeforeInsert() != null && tableMapping.getTruncateBeforeInsert()) {
+                try (Statement truncateStmt = targetConn.createStatement()) {
+                    String truncateSql = String.format("TRUNCATE TABLE %s.%s",
+                        quoteIdentifier(tableMapping.getTargetSchema()),
+                        quoteIdentifier(tableMapping.getTargetTable()));
+                    truncateStmt.execute(truncateSql);
+                    addLog(progress, "info", "Truncated table: " + tableMapping.getTargetTable(), null);
+                }
+            }
+            
             String insertSql = String.format("INSERT INTO %s.%s (%s) VALUES (%s)",
-                tableMapping.getTargetSchema(),
-                tableMapping.getTargetTable(),
+                quoteIdentifier(tableMapping.getTargetSchema()),
+                quoteIdentifier(tableMapping.getTargetTable()),
                 insertCols.toString(),
                 insertVals.toString());
             
@@ -260,13 +322,81 @@ public class MigrationService {
                         } else if (sourceType.contains("NUMBER") || sourceType.contains("NUMERIC")) {
                             // Handle numeric types
                             insertStmt.setObject(i + 1, value, Types.NUMERIC);
-                        } else if (sourceType.contains("CLOB") || sourceType.contains("TEXT") || 
-                                   sourceType.contains("LONG")) {
-                            // Handle text types
+                        } else if (sourceType.contains("CLOB") || sourceType.contains("TEXT")) {
+                            // Handle text types (but not LONG RAW - that's binary)
                             insertStmt.setObject(i + 1, value, Types.CLOB);
-                        } else if (sourceType.contains("BLOB") || sourceType.contains("RAW")) {
-                            // Handle binary types
-                            insertStmt.setObject(i + 1, value, Types.BLOB);
+                        } else if (sourceType.contains("BLOB") || sourceType.contains("RAW") || 
+                                   sourceType.contains("LONG RAW") || sourceType.equals("LONG RAW")) {
+                            // Handle binary types: BLOB, RAW, LONG RAW
+                            try {
+                                // Check if value is already a byte array
+                                if (value instanceof byte[]) {
+                                    insertStmt.setBytes(i + 1, (byte[]) value);
+                                } else if (value instanceof String) {
+                                    // If value is a String (hex), convert it to byte array
+                                    String hexString = (String) value;
+                                    // Remove any whitespace
+                                    hexString = hexString.replaceAll("\\s", "");
+                                    // Convert hex string to byte array
+                                    byte[] bytes = hexStringToByteArray(hexString);
+                                    insertStmt.setBytes(i + 1, bytes);
+                                } else {
+                                    // Try to get as binary data from ResultSet
+                                    if (sourceType.contains("LONG RAW") || sourceType.equals("LONG RAW")) {
+                                        // LONG RAW can be very large, use getBytes or getBinaryStream
+                                        try {
+                                            byte[] bytes = rs.getBytes(i + 1);
+                                            if (bytes != null) {
+                                                insertStmt.setBytes(i + 1, bytes);
+                                            } else {
+                                                insertStmt.setObject(i + 1, null);
+                                            }
+                                        } catch (SQLException e) {
+                                            // Fallback: try getBinaryStream for very large data
+                                            try (java.io.InputStream is = rs.getBinaryStream(i + 1)) {
+                                                if (is != null) {
+                                                    byte[] buffer = new byte[8192];
+                                                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                                                    int bytesRead;
+                                                    while ((bytesRead = is.read(buffer)) != -1) {
+                                                        baos.write(buffer, 0, bytesRead);
+                                                    }
+                                                    insertStmt.setBytes(i + 1, baos.toByteArray());
+                                                } else {
+                                                    insertStmt.setObject(i + 1, null);
+                                                }
+                                            } catch (java.io.IOException ioE) {
+                                                throw new SQLException("Failed to read LONG RAW data: " + ioE.getMessage(), ioE);
+                                            }
+                                        }
+                                    } else {
+                                        // Regular RAW or BLOB
+                                        try {
+                                            byte[] bytes = rs.getBytes(i + 1);
+                                            if (bytes != null) {
+                                                insertStmt.setBytes(i + 1, bytes);
+                                            } else {
+                                                insertStmt.setObject(i + 1, null);
+                                            }
+                                        } catch (SQLException e) {
+                                            // If we can't get bytes, try to convert the object
+                                            if (value != null) {
+                                                // Try to convert to byte array if possible
+                                                try {
+                                                    byte[] bytes = objectToByteArray(value);
+                                                    insertStmt.setBytes(i + 1, bytes);
+                                                } catch (Exception convE) {
+                                                    throw new SQLException("Failed to convert RAW/BLOB data: " + e.getMessage(), e);
+                                                }
+                                            } else {
+                                                insertStmt.setObject(i + 1, null);
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (SQLException e) {
+                                throw new SQLException("Failed to set RAW/LONG RAW/BLOB value: " + e.getMessage(), e);
+                            }
                         } else {
                             // Check if it's an Oracle-specific type by class name
                             String className = value.getClass().getName();
@@ -394,6 +524,79 @@ public class MigrationService {
         if (progress != null && "paused".equals(progress.getStatus())) {
             progress.setStatus("running");
             addLog(progress, "info", "Migration resumed", null);
+        }
+    }
+    
+    /**
+     * Convert hexadecimal string to byte array
+     * Handles hex strings like "2B2D2D2D..." to byte array
+     */
+    private byte[] hexStringToByteArray(String hex) {
+        if (hex == null || hex.isEmpty()) {
+            return new byte[0];
+        }
+        
+        // Remove any whitespace and ensure even length
+        hex = hex.replaceAll("\\s", "").toUpperCase();
+        if (hex.length() % 2 != 0) {
+            // Pad with leading zero if odd length
+            hex = "0" + hex;
+        }
+        
+        int len = hex.length();
+        byte[] data = new byte[len / 2];
+        for (int i = 0; i < len; i += 2) {
+            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
+                                 + Character.digit(hex.charAt(i + 1), 16));
+        }
+        return data;
+    }
+    
+    /**
+     * Convert object to byte array for binary types
+     * Handles various Oracle binary types
+     */
+    private byte[] objectToByteArray(Object value) throws Exception {
+        if (value == null) {
+            return null;
+        }
+        
+        if (value instanceof byte[]) {
+            return (byte[]) value;
+        }
+        
+        if (value instanceof String) {
+            // Try to parse as hex string
+            return hexStringToByteArray((String) value);
+        }
+        
+        // For Oracle-specific types, try to get bytes
+        String className = value.getClass().getName();
+        if (className.startsWith("oracle.sql.")) {
+            if (className.contains("RAW")) {
+                // Try to get bytes from Oracle RAW
+                try {
+                    java.lang.reflect.Method getBytesMethod = value.getClass().getMethod("getBytes");
+                    return (byte[]) getBytesMethod.invoke(value);
+                } catch (Exception e) {
+                    // Fallback: convert to string and parse as hex
+                    String strValue = value.toString();
+                    return hexStringToByteArray(strValue);
+                }
+            }
+        }
+        
+        // Last resort: convert to string and try hex parsing
+        String strValue = value.toString();
+        return hexStringToByteArray(strValue);
+    }
+    
+    private void updateTableMappingStatus(String projectId, String tableMappingId, String status) {
+        try {
+            tableMappingRepository.updateStatus(tableMappingId, status);
+        } catch (Exception e) {
+            // Log error but don't fail migration
+            System.err.println("Failed to update table mapping status: " + e.getMessage());
         }
     }
 }

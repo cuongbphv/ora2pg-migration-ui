@@ -66,3 +66,19 @@ This will cause a hydration error.%s <button> button
 [01:27:51.023] Server  LOG      ✓ Compiled in 101ms
 [01:27:54.072] Server  LOG      ✓ Compiled in 81ms
 [01:28:32.631] Server  LOG      ✓ Compiled in 79ms
+[01:46:47.837] Server  LOG      ✓ Compiled in 155ms
+[01:51:47.956] Browser ERROR   Failed to load projects: Internal server error: JDBC exception executing SQL [select tm1_0.project_id,tm1_0.id,tm1_0.drop_before_insert,tm1_0.enabled,tm1_0.filter_condition,tm1_0.source_schema,tm1_0.source_table,tm1_0.status,tm1_0.target_schema,tm1_0.target_table,tm1_0.truncate_before_insert from table_mappings tm1_0 where tm1_0.project_id=?] [ERROR: column tm1_0.drop_before_insert does not exist
+  Position: 34] [n/a]
+[02:11:15.226] Server  LOG      ✓ Compiled in 53ms
+[02:11:26.958] Server  LOG      ✓ Compiled in 60ms
+[02:11:27.733] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [dashboard, 42f05b82-fdbd-4349-9db3-f0c0926e2201, [object Object], false] [dashboard]
+[02:11:33.047] Server  LOG      ✓ Compiled in 58ms
+[02:11:36.076] Server  LOG      ✓ Compiled in 41ms
+[02:11:58.982] Server  LOG      ✓ Compiled in 76ms
+[02:12:08.690] Server  LOG      ✓ Compiled in 121ms
+[02:12:13.128] Server  LOG      ✓ Compiled in 72ms
+[02:12:36.827] Server  LOG      ✓ Compiled in 68ms
+[02:12:46.986] Server  LOG      ✓ Compiled in 70ms

@@ -5915,6 +5915,156 @@ function TableMappingView({ projectId }) {
                                             lineNumber: 613,
                                             columnNumber: 21
                                         }, this),
+                                        expandedTable === table.id && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                            className: "bg-muted/10 border-t border-border px-8 py-4 space-y-3",
+                                            children: [
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2",
+                                                    children: "Migration Options"
+                                                }, void 0, false, {
+                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                    lineNumber: 801,
+                                                    columnNumber: 23
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "space-y-1",
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                            className: "text-xs font-medium text-foreground",
+                                                            children: "Filter Condition (WHERE clause)"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/components/table-mapping.tsx",
+                                                            lineNumber: 807,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
+                                                            placeholder: "e.g., status = 'ACTIVE' AND created_date > '2024-01-01'",
+                                                            value: table.filterCondition || "",
+                                                            onChange: (e)=>{
+                                                                const updated = tables.map((t)=>t.id === table.id ? {
+                                                                        ...t,
+                                                                        filterCondition: e.target.value
+                                                                    } : t);
+                                                                setTables(updated);
+                                                                saveTableMappings(updated);
+                                                            },
+                                                            className: "h-8 text-xs font-mono bg-input"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/components/table-mapping.tsx",
+                                                            lineNumber: 808,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                            className: "text-xs text-muted-foreground",
+                                                            children: "Optional: Add WHERE clause to filter source data. Example: status = 'ACTIVE'"
+                                                        }, void 0, false, {
+                                                            fileName: "[project]/components/table-mapping.tsx",
+                                                            lineNumber: 820,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                    lineNumber: 806,
+                                                    columnNumber: 23
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                    className: "flex items-center gap-6",
+                                                    children: [
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            className: "flex items-center gap-2",
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                    type: "checkbox",
+                                                                    id: `drop-${table.id}`,
+                                                                    checked: table.dropBeforeInsert || false,
+                                                                    onChange: (e)=>{
+                                                                        const updated = tables.map((t)=>t.id === table.id ? {
+                                                                                ...t,
+                                                                                dropBeforeInsert: e.target.checked,
+                                                                                truncateBeforeInsert: e.target.checked ? false : t.truncateBeforeInsert
+                                                                            } : t);
+                                                                        setTables(updated);
+                                                                        saveTableMappings(updated);
+                                                                    },
+                                                                    className: "w-4 h-4 rounded border-input"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                                    lineNumber: 828,
+                                                                    columnNumber: 27
+                                                                }, this),
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                                    htmlFor: `drop-${table.id}`,
+                                                                    className: "text-xs font-medium cursor-pointer",
+                                                                    children: "Drop table before migration"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                                    lineNumber: 841,
+                                                                    columnNumber: 27
+                                                                }, this)
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/components/table-mapping.tsx",
+                                                            lineNumber: 827,
+                                                            columnNumber: 25
+                                                        }, this),
+                                                        /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
+                                                            className: "flex items-center gap-2",
+                                                            children: [
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("input", {
+                                                                    type: "checkbox",
+                                                                    id: `truncate-${table.id}`,
+                                                                    checked: table.truncateBeforeInsert || false,
+                                                                    onChange: (e)=>{
+                                                                        const updated = tables.map((t)=>t.id === table.id ? {
+                                                                                ...t,
+                                                                                truncateBeforeInsert: e.target.checked,
+                                                                                dropBeforeInsert: e.target.checked ? false : t.dropBeforeInsert
+                                                                            } : t);
+                                                                        setTables(updated);
+                                                                        saveTableMappings(updated);
+                                                                    },
+                                                                    className: "w-4 h-4 rounded border-input"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                                    lineNumber: 846,
+                                                                    columnNumber: 27
+                                                                }, this),
+                                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("label", {
+                                                                    htmlFor: `truncate-${table.id}`,
+                                                                    className: "text-xs font-medium cursor-pointer",
+                                                                    children: "Truncate table before insert"
+                                                                }, void 0, false, {
+                                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                                    lineNumber: 859,
+                                                                    columnNumber: 27
+                                                                }, this)
+                                                            ]
+                                                        }, void 0, true, {
+                                                            fileName: "[project]/components/table-mapping.tsx",
+                                                            lineNumber: 845,
+                                                            columnNumber: 25
+                                                        }, this)
+                                                    ]
+                                                }, void 0, true, {
+                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                    lineNumber: 826,
+                                                    columnNumber: 23
+                                                }, this),
+                                                /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
+                                                    className: "text-xs text-muted-foreground",
+                                                    children: "Note: Drop removes the table completely. Truncate clears data but keeps the table structure."
+                                                }, void 0, false, {
+                                                    fileName: "[project]/components/table-mapping.tsx",
+                                                    lineNumber: 864,
+                                                    columnNumber: 23
+                                                }, this)
+                                            ]
+                                        }, void 0, true, {
+                                            fileName: "[project]/components/table-mapping.tsx",
+                                            lineNumber: 800,
+                                            columnNumber: 21
+                                        }, this),
                                         expandedTable === table.id && table.columnMappings.length === 0 && /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("div", {
                                             className: "bg-muted/10 border-t border-border px-8 py-6 text-center",
                                             children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("p", {
@@ -5922,12 +6072,12 @@ function TableMappingView({ projectId }) {
                                                 children: "No column mappings configured yet."
                                             }, void 0, false, {
                                                 fileName: "[project]/components/table-mapping.tsx",
-                                                lineNumber: 801,
+                                                lineNumber: 873,
                                                 columnNumber: 23
                                             }, this)
                                         }, void 0, false, {
                                             fileName: "[project]/components/table-mapping.tsx",
-                                            lineNumber: 800,
+                                            lineNumber: 872,
                                             columnNumber: 21
                                         }, this)
                                     ]
@@ -5972,7 +6122,7 @@ function EditableTableName({ schema, table, onSave, onCancel }) {
                 className: "w-4 h-4 text-postgres shrink-0"
             }, void 0, false, {
                 fileName: "[project]/components/table-mapping.tsx",
-                lineNumber: 830,
+                lineNumber: 902,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -5981,7 +6131,7 @@ function EditableTableName({ schema, table, onSave, onCancel }) {
                 className: "h-7 w-20 text-xs font-mono bg-input"
             }, void 0, false, {
                 fileName: "[project]/components/table-mapping.tsx",
-                lineNumber: 831,
+                lineNumber: 903,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("span", {
@@ -5989,7 +6139,7 @@ function EditableTableName({ schema, table, onSave, onCancel }) {
                 children: "."
             }, void 0, false, {
                 fileName: "[project]/components/table-mapping.tsx",
-                lineNumber: 836,
+                lineNumber: 908,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$components$2f$ui$2f$input$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["Input"], {
@@ -5998,7 +6148,7 @@ function EditableTableName({ schema, table, onSave, onCancel }) {
                 className: "h-7 w-28 text-xs font-mono bg-input"
             }, void 0, false, {
                 fileName: "[project]/components/table-mapping.tsx",
-                lineNumber: 837,
+                lineNumber: 909,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -6008,12 +6158,12 @@ function EditableTableName({ schema, table, onSave, onCancel }) {
                     className: "w-3 h-3"
                 }, void 0, false, {
                     fileName: "[project]/components/table-mapping.tsx",
-                    lineNumber: 843,
+                    lineNumber: 915,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/components/table-mapping.tsx",
-                lineNumber: 842,
+                lineNumber: 914,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("button", {
@@ -6023,18 +6173,18 @@ function EditableTableName({ schema, table, onSave, onCancel }) {
                     className: "w-3 h-3"
                 }, void 0, false, {
                     fileName: "[project]/components/table-mapping.tsx",
-                    lineNumber: 846,
+                    lineNumber: 918,
                     columnNumber: 9
                 }, this)
             }, void 0, false, {
                 fileName: "[project]/components/table-mapping.tsx",
-                lineNumber: 845,
+                lineNumber: 917,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/components/table-mapping.tsx",
-        lineNumber: 829,
+        lineNumber: 901,
         columnNumber: 5
     }, this);
 }
@@ -9430,11 +9580,22 @@ function MainContent() {
         user,
         authLoading
     ]);
+    // Reload project when switching to dashboard tab to get fresh data
+    (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$index$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useEffect"])({
+        "MainContent.useEffect": ()=>{
+            if (activeTab === "dashboard" && selectedProjectId && user && !authLoading) {
+                // Reload projects to get updated table statuses
+                loadProjects();
+            }
+        }
+    }["MainContent.useEffect"], [
+        activeTab
+    ]);
     const loadProjects = async ()=>{
         try {
             setLoading(true);
             const result = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiService"].getProjects();
-            if (result.data) {
+            if (result.data && Array.isArray(result.data)) {
                 setProjects(result.data);
                 if (result.data.length > 0 && !selectedProjectId) {
                     setSelectedProjectId(result.data[0].id);
@@ -9467,8 +9628,9 @@ function MainContent() {
         try {
             const result = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiService"].createProject(name, description);
             if (result.data) {
+                const project = result.data;
                 await loadProjects();
-                setSelectedProjectId(result.data.id);
+                setSelectedProjectId(project.id);
                 setNewProjectOpen(false);
             }
         } catch (error) {
@@ -9480,8 +9642,9 @@ function MainContent() {
         try {
             const result = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiService"].saveConnection(selectedProjectId, "source", config);
             if (result.data) {
+                const project = result.data;
                 await loadProjects();
-                setSelectedProjectId(result.data.id);
+                setSelectedProjectId(project.id);
             }
         } catch (error) {
             console.error("Failed to save source connection:", error);
@@ -9492,8 +9655,9 @@ function MainContent() {
         try {
             const result = await __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$api$2e$ts__$5b$app$2d$client$5d$__$28$ecmascript$29$__["apiService"].saveConnection(selectedProjectId, "target", config);
             if (result.data) {
+                const project = result.data;
                 await loadProjects();
-                setSelectedProjectId(result.data.id);
+                setSelectedProjectId(project.id);
             }
         } catch (error) {
             console.error("Failed to save target connection:", error);
@@ -9506,7 +9670,7 @@ function MainContent() {
                     project: selectedProject
                 }, void 0, false, {
                     fileName: "[project]/app/page.tsx",
-                    lineNumber: 117,
+                    lineNumber: 128,
                     columnNumber: 16
                 }, this);
             case "connections":
@@ -9517,7 +9681,7 @@ function MainContent() {
                     onSaveTarget: handleSaveTarget
                 }, void 0, false, {
                     fileName: "[project]/app/page.tsx",
-                    lineNumber: 120,
+                    lineNumber: 131,
                     columnNumber: 11
                 }, this);
             case "tables":
@@ -9525,13 +9689,13 @@ function MainContent() {
                     projectId: selectedProjectId
                 }, void 0, false, {
                     fileName: "[project]/app/page.tsx",
-                    lineNumber: 128,
+                    lineNumber: 139,
                     columnNumber: 16
                 }, this);
             case "datatypes":
                 return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$components$2f$data$2d$type$2d$rules$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["DataTypeRules"], {}, void 0, false, {
                     fileName: "[project]/app/page.tsx",
-                    lineNumber: 130,
+                    lineNumber: 141,
                     columnNumber: 16
                 }, this);
             case "migration":
@@ -9539,7 +9703,7 @@ function MainContent() {
                     projectId: selectedProjectId
                 }, void 0, false, {
                     fileName: "[project]/app/page.tsx",
-                    lineNumber: 132,
+                    lineNumber: 143,
                     columnNumber: 16
                 }, this);
             default:
@@ -9547,7 +9711,7 @@ function MainContent() {
                     project: selectedProject
                 }, void 0, false, {
                     fileName: "[project]/app/page.tsx",
-                    lineNumber: 134,
+                    lineNumber: 145,
                     columnNumber: 16
                 }, this);
         }
@@ -9561,12 +9725,12 @@ function MainContent() {
                 children: "Loading..."
             }, void 0, false, {
                 fileName: "[project]/app/page.tsx",
-                lineNumber: 142,
+                lineNumber: 153,
                 columnNumber: 9
             }, this)
         }, void 0, false, {
             fileName: "[project]/app/page.tsx",
-            lineNumber: 141,
+            lineNumber: 152,
             columnNumber: 7
         }, this);
     }
@@ -9574,7 +9738,7 @@ function MainContent() {
     if (!user) {
         return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$components$2f$login$2d$page$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["LoginPage"], {}, void 0, false, {
             fileName: "[project]/app/page.tsx",
-            lineNumber: 149,
+            lineNumber: 160,
             columnNumber: 12
         }, this);
     }
@@ -9593,7 +9757,7 @@ function MainContent() {
                 onOpenSettings: ()=>setSettingsOpen(true)
             }, void 0, false, {
                 fileName: "[project]/app/page.tsx",
-                lineNumber: 154,
+                lineNumber: 165,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])("main", {
@@ -9601,7 +9765,7 @@ function MainContent() {
                 children: renderContent()
             }, void 0, false, {
                 fileName: "[project]/app/page.tsx",
-                lineNumber: 165,
+                lineNumber: 176,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$components$2f$new$2d$project$2d$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["NewProjectDialog"], {
@@ -9610,7 +9774,7 @@ function MainContent() {
                 onCreateProject: handleNewProject
             }, void 0, false, {
                 fileName: "[project]/app/page.tsx",
-                lineNumber: 167,
+                lineNumber: 178,
                 columnNumber: 7
             }, this),
             /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$components$2f$settings$2d$dialog$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["SettingsDialog"], {
@@ -9629,17 +9793,17 @@ function MainContent() {
                 }
             }, void 0, false, {
                 fileName: "[project]/app/page.tsx",
-                lineNumber: 169,
+                lineNumber: 180,
                 columnNumber: 7
             }, this)
         ]
     }, void 0, true, {
         fileName: "[project]/app/page.tsx",
-        lineNumber: 153,
+        lineNumber: 164,
         columnNumber: 5
     }, this);
 }
-_s(MainContent, "id8LmdBeptBl8ry5FAEmhezO+1g=", false, function() {
+_s(MainContent, "RwTWbyBoRjczslQLrKbKbXR04Ig=", false, function() {
     return [
         __TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$auth$2d$context$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["useAuth"]
     ];
@@ -9649,12 +9813,12 @@ function HomePage() {
     return /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(__TURBOPACK__imported__module__$5b$project$5d2f$lib$2f$auth$2d$context$2e$tsx__$5b$app$2d$client$5d$__$28$ecmascript$29$__["AuthProvider"], {
         children: /*#__PURE__*/ (0, __TURBOPACK__imported__module__$5b$project$5d2f$node_modules$2f$next$2f$dist$2f$compiled$2f$react$2f$jsx$2d$dev$2d$runtime$2e$js__$5b$app$2d$client$5d$__$28$ecmascript$29$__["jsxDEV"])(MainContent, {}, void 0, false, {
             fileName: "[project]/app/page.tsx",
-            lineNumber: 191,
+            lineNumber: 202,
             columnNumber: 7
         }, this)
     }, void 0, false, {
         fileName: "[project]/app/page.tsx",
-        lineNumber: 190,
+        lineNumber: 201,
         columnNumber: 5
     }, this);
 }

@@ -19,6 +19,9 @@ public class TableMapping {
     private Boolean enabled;
     private List<ColumnMapping> columnMappings;
     private String status; // "pending", "mapped", "migrated", "error"
+    private String filterCondition; // WHERE clause for filtering source data
+    private Boolean dropBeforeInsert; // Drop table before migration
+    private Boolean truncateBeforeInsert; // Truncate table before migration
     
     public TableMapping(String id, String sourceTable, String sourceSchema, String targetTable, String targetSchema) {
         this.id = id;

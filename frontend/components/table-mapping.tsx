@@ -795,6 +795,78 @@ export function TableMappingView({ projectId }: TableMappingProps) {
                     </div>
                   )}
 
+                  {/* Table Options: Filter, Drop, Truncate */}
+                  {expandedTable === table.id && (
+                    <div className="bg-muted/10 border-t border-border px-8 py-4 space-y-3">
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                        Migration Options
+                      </div>
+                      
+                      {/* Filter Condition */}
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-foreground">Filter Condition (WHERE clause)</label>
+                        <Input
+                          placeholder="e.g., status = 'ACTIVE' AND created_date > '2024-01-01'"
+                          value={table.filterCondition || ""}
+                          onChange={(e) => {
+                            const updated = tables.map((t) =>
+                              t.id === table.id ? { ...t, filterCondition: e.target.value } : t
+                            )
+                            setTables(updated)
+                            saveTableMappings(updated)
+                          }}
+                          className="h-8 text-xs font-mono bg-input"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Optional: Add WHERE clause to filter source data. Example: status = 'ACTIVE'
+                        </p>
+                      </div>
+                      
+                      {/* Drop/Truncate Options */}
+                      <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`drop-${table.id}`}
+                            checked={table.dropBeforeInsert || false}
+                            onChange={(e) => {
+                              const updated = tables.map((t) =>
+                                t.id === table.id ? { ...t, dropBeforeInsert: e.target.checked, truncateBeforeInsert: e.target.checked ? false : t.truncateBeforeInsert } : t
+                              )
+                              setTables(updated)
+                              saveTableMappings(updated)
+                            }}
+                            className="w-4 h-4 rounded border-input"
+                          />
+                          <label htmlFor={`drop-${table.id}`} className="text-xs font-medium cursor-pointer">
+                            Drop table before migration
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`truncate-${table.id}`}
+                            checked={table.truncateBeforeInsert || false}
+                            onChange={(e) => {
+                              const updated = tables.map((t) =>
+                                t.id === table.id ? { ...t, truncateBeforeInsert: e.target.checked, dropBeforeInsert: e.target.checked ? false : t.dropBeforeInsert } : t
+                              )
+                              setTables(updated)
+                              saveTableMappings(updated)
+                            }}
+                            className="w-4 h-4 rounded border-input"
+                          />
+                          <label htmlFor={`truncate-${table.id}`} className="text-xs font-medium cursor-pointer">
+                            Truncate table before insert
+                          </label>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Note: Drop removes the table completely. Truncate clears data but keeps the table structure.
+                      </p>
+                    </div>
+                  )}
+                  
                   {/* Empty columns state */}
                   {expandedTable === table.id && table.columnMappings.length === 0 && (
                     <div className="bg-muted/10 border-t border-border px-8 py-6 text-center">

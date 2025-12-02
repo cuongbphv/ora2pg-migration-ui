@@ -334,7 +334,9 @@ public class DatabaseService {
         // Simple type mappings
         if (baseType.equals("CLOB") || baseType.equals("NCLOB") || baseType.equals("LONG")) return "TEXT";
         if (baseType.equals("DATE")) return "TIMESTAMP";
-        if (baseType.equals("BLOB") || baseType.equals("RAW") || baseType.equals("LONG RAW")) {
+        // Handle binary types - note: LONG RAW is binary, not text
+        if (baseType.equals("BLOB") || baseType.equals("RAW") || baseType.equals("LONG RAW") || 
+            baseType.equals("LONGRAW") || upperType.contains("LONG RAW") || upperType.contains("LONGRAW")) {
             return "BYTEA";
         }
         if (baseType.equals("BFILE")) return "BYTEA";

@@ -37,12 +37,20 @@ function MainContent() {
     }
   }, [user, authLoading])
 
+  // Reload project when switching to dashboard tab to get fresh data
+  useEffect(() => {
+    if (activeTab === "dashboard" && selectedProjectId && user && !authLoading) {
+      // Reload projects to get updated table statuses
+      loadProjects()
+    }
+  }, [activeTab])
+
   const loadProjects = async () => {
     try {
       setLoading(true)
       const result = await apiService.getProjects()
-      if (result.data) {
-        setProjects(result.data)
+      if (result.data && Array.isArray(result.data)) {
+        setProjects(result.data as Project[])
         if (result.data.length > 0 && !selectedProjectId) {
           setSelectedProjectId(result.data[0].id)
         }
@@ -65,7 +73,7 @@ function MainContent() {
     try {
       const result = await apiService.getSettings()
       if (result.data) {
-        setAppSettings(result.data)
+        setAppSettings(result.data as AppSettings)
       }
     } catch (error) {
       console.error("Failed to load settings:", error)
@@ -76,8 +84,9 @@ function MainContent() {
     try {
       const result = await apiService.createProject(name, description)
       if (result.data) {
+        const project = result.data as Project
         await loadProjects()
-        setSelectedProjectId(result.data.id)
+        setSelectedProjectId(project.id)
         setNewProjectOpen(false)
       }
     } catch (error) {
@@ -90,8 +99,9 @@ function MainContent() {
     try {
       const result = await apiService.saveConnection(selectedProjectId, "source", config)
       if (result.data) {
+        const project = result.data as Project
         await loadProjects()
-        setSelectedProjectId(result.data.id)
+        setSelectedProjectId(project.id)
       }
     } catch (error) {
       console.error("Failed to save source connection:", error)
@@ -103,8 +113,9 @@ function MainContent() {
     try {
       const result = await apiService.saveConnection(selectedProjectId, "target", config)
       if (result.data) {
+        const project = result.data as Project
         await loadProjects()
-        setSelectedProjectId(result.data.id)
+        setSelectedProjectId(project.id)
       }
     } catch (error) {
       console.error("Failed to save target connection:", error)

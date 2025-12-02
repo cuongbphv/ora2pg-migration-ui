@@ -31,6 +31,9 @@ export interface TableMapping {
   enabled: boolean
   columnMappings: ColumnMapping[]
   status: "pending" | "mapped" | "migrated" | "error"
+  filterCondition?: string
+  dropBeforeInsert?: boolean
+  truncateBeforeInsert?: boolean
 }
 
 export interface ColumnMapping {
