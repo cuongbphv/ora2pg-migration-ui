@@ -1,0 +1,68 @@
+[00:00:00.809] Server  LOG      ✓ Ready in 520ms
+[00:01:42.094] Server  LOG      ✓ Compiled in 96ms
+[00:01:45.052] Server  LOG      ✓ Compiled in 83ms
+[00:01:55.156] Server  LOG      ✓ Compiled in 124ms
+[00:06:39.625] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
+This will cause a hydration error.%s <button> button 
+
+  ...
+    <RedirectBoundary>
+      <RedirectErrorBoundary router={{...}}>
+        <InnerLayoutRouter url="/" tree={[...]} params={{}} cacheNode={{lazyData:null, ...}} segmentPath={[...]} ...>
+          <SegmentViewNode type="page" pagePath="page.tsx">
+            <SegmentTrieNode>
+            <ClientPageRoot Component={function HomePage} serverProvidedParams={{...}}>
+              <HomePage params={Promise} searchParams={Promise}>
+                <AuthProvider>
+                  <MainContent>
+                    <div className="flex h-scr...">
+                      <Sidebar projects={[...]} selectedProjectId={null} ...>
+                        <aside className="w-64 bg-si...">
+                          <div>
+                          <div className="p-2">
+>                           <button
+>                             onClick={function onClick}
+>                             className="flex items-center justify-between w-full px-2 py-1.5 text-sm text-muted-foreg..."
+>                           >
+                              <span>
+>                             <button onClick={function onClick} className="p-1 hover:bg-sidebar-accent rounded">
+                            ...
+                          ...
+                      ...
+          ...
+        ...
+
+[00:07:21.439] Server  LOG      ✓ Compiled in 85ms
+[00:24:35.669] Server  LOG      ✓ Compiled in 86ms
+[00:35:51.965] Server  LOG      ✓ Compiled in 152ms
+[00:38:49.992] Server  LOG      ✓ Compiled in 63ms
+[00:39:10.738] Server  LOG      ✓ Compiled in 84ms
+[00:39:14.526] Server  LOG      ✓ Compiled in 85ms
+[00:39:23.947] Server  LOG      ✓ Compiled in 88ms
+[00:39:27.798] Server  LOG      ✓ Compiled in 70ms
+[00:50:30.420] Server  LOG      ✓ Compiled in 68ms
+[00:50:32.331] Server  LOG      ✓ Compiled in 98ms
+[00:50:34.918] Server  LOG      ✓ Compiled in 69ms
+[00:50:40.693] Server  LOG      ✓ Compiled in 78ms
+[00:50:43.553] Server  LOG      ✓ Compiled in 84ms
+[00:50:49.019] Server  LOG      ✓ Compiled in 60ms
+[00:51:01.840] Server  LOG      ✓ Compiled in 62ms
+[00:51:18.491] Server  LOG      ✓ Compiled in 77ms
+[00:51:20.593] Server  LOG      ✓ Compiled in 86ms
+[00:51:25.174] Server  LOG      ✓ Compiled in 71ms
+[00:51:33.492] Server  LOG      ✓ Compiled in 72ms
+[00:51:42.102] Server  LOG      ✓ Compiled in 82ms
+[00:51:54.144] Server  LOG      ✓ Compiled in 68ms
+[00:52:09.510] Server  LOG      ✓ Compiled in 209ms
+[00:52:23.089] Server  LOG      ✓ Compiled in 90ms
+[01:00:14.507] Server  LOG      ✓ Compiled in 85ms
+[01:14:05.360] Server  LOG      ✓ Compiled in 85ms
+[01:14:42.838] Server  LOG      ✓ Compiled in 82ms
+[01:16:15.963] Server  LOG      ✓ Compiled in 131ms
+[01:21:16.093] Server  LOG      ✓ Compiled in 85ms
+[01:21:27.215] Server  LOG      ✓ Compiled in 51ms
+[01:24:33.406] Browser ERROR   Failed to load projects: Failed to fetch
+[01:25:07.743] Browser ERROR   Failed to load projects: Failed to fetch
+[01:27:51.023] Server  LOG      ✓ Compiled in 101ms
+[01:27:54.072] Server  LOG      ✓ Compiled in 81ms
+[01:28:32.631] Server  LOG      ✓ Compiled in 79ms

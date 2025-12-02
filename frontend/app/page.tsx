@@ -1,0 +1,194 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Sidebar } from "@/components/sidebar"
+import { Dashboard } from "@/components/dashboard"
+import { ConnectionForm } from "@/components/connection-form"
+import { TableMappingView } from "@/components/table-mapping"
+import { DataTypeRules } from "@/components/data-type-rules"
+import { MigrationPanel } from "@/components/migration-panel"
+import { NewProjectDialog } from "@/components/new-project-dialog"
+import { LoginPage } from "@/components/login-page"
+import { SettingsDialog, defaultSettings } from "@/components/settings-dialog"
+import { AuthProvider, useAuth } from "@/lib/auth-context"
+import { apiService } from "@/lib/api"
+import type { Project, ConnectionConfig, AppSettings } from "@/lib/types"
+
+function MainContent() {
+  const { user, logout, isLoading: authLoading } = useAuth()
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState("dashboard")
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings)
+  const [loading, setLoading] = useState(true)
+
+  const selectedProject = projects.find((p) => p.id === selectedProjectId) || null
+
+  // Load projects on mount and when user changes
+  useEffect(() => {
+    if (user && !authLoading) {
+      loadProjects()
+      loadSettings()
+    } else if (!authLoading && !user) {
+      // No user and auth is done loading, stop loading state
+      setLoading(false)
+    }
+  }, [user, authLoading])
+
+  const loadProjects = async () => {
+    try {
+      setLoading(true)
+      const result = await apiService.getProjects()
+      if (result.data) {
+        setProjects(result.data)
+        if (result.data.length > 0 && !selectedProjectId) {
+          setSelectedProjectId(result.data[0].id)
+        }
+      } else if (result.error) {
+        console.error("Failed to load projects:", result.error)
+        // If it's an auth error, the auth context will handle it
+        if (result.error.includes("Authentication")) {
+          // Token might be invalid, let auth context handle it
+          return
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load projects:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadSettings = async () => {
+    try {
+      const result = await apiService.getSettings()
+      if (result.data) {
+        setAppSettings(result.data)
+      }
+    } catch (error) {
+      console.error("Failed to load settings:", error)
+    }
+  }
+
+  const handleNewProject = async (name: string, description: string) => {
+    try {
+      const result = await apiService.createProject(name, description)
+      if (result.data) {
+        await loadProjects()
+        setSelectedProjectId(result.data.id)
+        setNewProjectOpen(false)
+      }
+    } catch (error) {
+      console.error("Failed to create project:", error)
+    }
+  }
+
+  const handleSaveSource = async (config: ConnectionConfig) => {
+    if (!selectedProjectId) return
+    try {
+      const result = await apiService.saveConnection(selectedProjectId, "source", config)
+      if (result.data) {
+        await loadProjects()
+        setSelectedProjectId(result.data.id)
+      }
+    } catch (error) {
+      console.error("Failed to save source connection:", error)
+    }
+  }
+
+  const handleSaveTarget = async (config: ConnectionConfig) => {
+    if (!selectedProjectId) return
+    try {
+      const result = await apiService.saveConnection(selectedProjectId, "target", config)
+      if (result.data) {
+        await loadProjects()
+        setSelectedProjectId(result.data.id)
+      }
+    } catch (error) {
+      console.error("Failed to save target connection:", error)
+    }
+  }
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case "dashboard":
+        return <Dashboard project={selectedProject} />
+      case "connections":
+        return (
+          <ConnectionForm
+            sourceConnection={selectedProject?.sourceConnection}
+            targetConnection={selectedProject?.targetConnection}
+            onSaveSource={handleSaveSource}
+            onSaveTarget={handleSaveTarget}
+          />
+        )
+      case "tables":
+        return <TableMappingView projectId={selectedProjectId} />
+      case "datatypes":
+        return <DataTypeRules />
+      case "migration":
+        return <MigrationPanel projectId={selectedProjectId} />
+      default:
+        return <Dashboard project={selectedProject} />
+    }
+  }
+
+  // Show loading only if auth is loading or if we have a user and are loading projects
+  if (authLoading || (user && loading)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    )
+  }
+
+  // Show login page if no user (and auth is done loading)
+  if (!user) {
+    return <LoginPage />
+  }
+
+  return (
+    <div className="flex h-screen bg-background">
+      <Sidebar
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+        onSelectProject={setSelectedProjectId}
+        onNewProject={() => setNewProjectOpen(true)}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        user={user}
+        onLogout={logout}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+      <main className="flex-1 overflow-auto">{renderContent()}</main>
+
+      <NewProjectDialog open={newProjectOpen} onOpenChange={setNewProjectOpen} onCreateProject={handleNewProject} />
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        settings={appSettings}
+        onSaveSettings={async (settings) => {
+          try {
+            const result = await apiService.updateSettings(settings)
+            if (result.data) {
+              setAppSettings(settings)
+            }
+          } catch (error) {
+            console.error("Failed to save settings:", error)
+          }
+        }}
+      />
+    </div>
+  )
+}
+
+export default function HomePage() {
+  return (
+    <AuthProvider>
+      <MainContent />
+    </AuthProvider>
+  )
+}
