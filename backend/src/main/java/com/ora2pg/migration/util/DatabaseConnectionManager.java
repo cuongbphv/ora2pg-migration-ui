@@ -4,28 +4,14 @@ import com.ora2pg.migration.model.ConnectionConfig;
 import org.springframework.stereotype.Component;
 
 import java.sql.*;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Properties;
 
 @Component
 public class DatabaseConnectionManager {
     
-    private final Map<String, Connection> connectionPool = new HashMap<>();
-    
     public Connection getConnection(ConnectionConfig config) throws SQLException {
-        String connectionKey = generateConnectionKey(config);
-        
-        // Check if connection exists and is valid
-        Connection existing = connectionPool.get(connectionKey);
-        if (existing != null && !existing.isClosed() && existing.isValid(5)) {
-            return existing;
-        }
-        
-        // Create new connection
-        Connection connection = createConnection(config);
-        connectionPool.put(connectionKey, connection);
-        return connection;
+        // Always return a dedicated connection for the caller to avoid sharing state
+        return createConnection(config);
     }
     
     private Connection createConnection(ConnectionConfig config) throws SQLException {
@@ -94,33 +80,6 @@ public class DatabaseConnectionManager {
         return "Unknown";
     }
     
-    public void closeConnection(ConnectionConfig config) {
-        String connectionKey = generateConnectionKey(config);
-        Connection connection = connectionPool.remove(connectionKey);
-        if (connection != null) {
-            try {
-                connection.close();
-            } catch (SQLException e) {
-                // Log error but don't throw
-            }
-        }
-    }
-    
-    public void closeAllConnections() {
-        connectionPool.values().forEach(conn -> {
-            try {
-                conn.close();
-            } catch (SQLException e) {
-                // Log error but don't throw
-            }
-        });
-        connectionPool.clear();
-    }
-    
-    private String generateConnectionKey(ConnectionConfig config) {
-        return String.format("%s:%s:%d:%s:%s", 
-            config.getType(), config.getHost(), config.getPort(), 
-            config.getDatabase(), config.getUsername());
-    }
+    // Legacy close methods are no longer required because each caller manages its own connection lifecycle.
 }
 
