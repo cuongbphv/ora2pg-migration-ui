@@ -9,6 +9,12 @@ import { PlayIcon, PauseIcon, CheckIcon, AlertIcon, ClockIcon, DownloadIcon } fr
 import { cn } from "@/lib/utils"
 import { apiService } from "@/lib/api"
 import { toast } from "@/lib/toast"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface MigrationPanelProps {
   projectId?: string | null
@@ -18,6 +24,7 @@ export function MigrationPanel({ projectId }: MigrationPanelProps) {
   const [progress, setProgress] = useState<MigrationProgress | null>(null)
   const [isRunning, setIsRunning] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const loadProgress = useCallback(async () => {
     if (!projectId) return
@@ -152,6 +159,32 @@ export function MigrationPanel({ projectId }: MigrationPanelProps) {
         return <AlertIcon className="w-4 h-4 text-destructive" />
       default:
         return <ClockIcon className="w-4 h-4 text-muted-foreground" />
+    }
+  }
+
+  const handleExport = async (format: 'csv' | 'excel') => {
+    if (!projectId) {
+      toast.warn("No project selected", "Please select a project first")
+      return
+    }
+
+    if (!progress?.logs || progress.logs.length === 0) {
+      toast.warn("No logs to export", "There are no migration logs available")
+      return
+    }
+
+    setExporting(true)
+    try {
+      const result = await apiService.exportMigrationLogs(projectId, format)
+      if (result.data) {
+        toast.success("Export successful", `Migration logs exported as ${format.toUpperCase()}`)
+      } else if (result.error) {
+        toast.error("Export failed", result.error)
+      }
+    } catch (error) {
+      toast.error("Export failed", error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -299,10 +332,30 @@ export function MigrationPanel({ projectId }: MigrationPanelProps) {
             <CardTitle className="text-base">Migration Log</CardTitle>
             <CardDescription>Real-time migration activity log</CardDescription>
           </div>
-          <Button variant="outline" size="sm">
-            <DownloadIcon className="w-4 h-4 mr-2" />
-            Export Log
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={exporting || !projectId || !progress?.logs || progress.logs.length === 0}>
+                <DownloadIcon className="w-4 h-4 mr-2" />
+                {exporting ? "Exporting..." : "Export Log"}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => handleExport('excel')}
+                disabled={exporting}
+              >
+                <DownloadIcon className="w-4 h-4 mr-2" />
+                Export as Excel (.xlsx)
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => handleExport('csv')}
+                disabled={exporting}
+              >
+                <DownloadIcon className="w-4 h-4 mr-2" />
+                Export as CSV (.csv)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </CardHeader>
         <CardContent>
           <div className="bg-background rounded-lg border border-border max-h-80 overflow-y-auto">

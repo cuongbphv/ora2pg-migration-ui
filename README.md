@@ -81,12 +81,33 @@ This tool provides a complete solution for migrating Oracle databases to Postgre
    - Connection status indicators
    - Auto-refresh on navigation
 
-8. **Security**
-   - JWT-based authentication
-   - Password hashing with BCrypt
-   - Role-based access control (admin/user)
-   - User-specific data isolation
-   - CORS configuration
+8. **PG2PG Pipeline (PostgreSQL to PostgreSQL)**
+   - Create and manage data migration pipelines
+   - Multiple pipeline steps with custom transformations
+   - Column-level mapping with transformation expressions
+   - Filter conditions and data transformation rules
+   - Import pipeline configuration from JSON files
+   - Real-time execution monitoring and logging
+
+9. **Data Type Mapping Rules**
+   - View and manage Oracle to PostgreSQL type mappings
+   - Create custom mapping rules
+   - Override default mappings per user
+   - System defaults with user customization
+   - Search and filter mapping rules
+
+10. **Migration Log Export**
+    - Export migration logs to CSV format
+    - Export migration logs to Excel format (.xlsx)
+    - Formatted exports with color-coded log levels
+    - Chronological log ordering
+
+11. **Security**
+    - JWT-based authentication
+    - Password hashing with BCrypt
+    - Role-based access control (admin/user)
+    - User-specific data isolation
+    - CORS configuration
 
 ## 🏗️ Architecture
 
@@ -170,7 +191,7 @@ oracle-to-postgres-migration/
 ┌─────────────────┐
 │   Backend API   │
 │  (Spring Boot)  │
-│   Port: 8090    │
+│   Port: 8095    │
 └────────┬────────┘
          │
          ├──────────────┐
@@ -302,7 +323,7 @@ oracle-to-postgres-migration/
 - **Docker**: 20.10 or higher
 - **Docker Compose**: 2.0 or higher
 - **RAM**: At least 4GB available
-- **Ports**: 3000, 8090, 5432 available
+- **Ports**: 3000, 8095, 5432 available
 
 ## 🚀 Installation
 
@@ -333,7 +354,7 @@ This is the easiest way to get started:
 
 5. **Access the application**:
    - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8090/api
+   - Backend API: http://localhost:8095/api
    - PostgreSQL: localhost:5432
 
 ### Option 2: Manual Installation
@@ -370,7 +391,7 @@ This is the easiest way to get started:
    mvn spring-boot:run
    ```
 
-   The API will be available at `http://localhost:8090/api`
+   The API will be available at `http://localhost:8095/api`
 
 #### Frontend Setup
 
@@ -386,10 +407,10 @@ This is the easiest way to get started:
    pnpm install
    ```
 
-3. **Configure API URL** (if backend is not on localhost:8090):
+3. **Configure API URL** (if backend is not on localhost:8095):
    - Create `.env.local`:
      ```env
-     NEXT_PUBLIC_API_URL=http://localhost:8090/api
+     NEXT_PUBLIC_API_URL=http://localhost:8095/api
      ```
 
 4. **Run the development server**:
@@ -418,7 +439,7 @@ Edit `backend/src/main/resources/application.properties`:
 
 ```properties
 # Server Configuration
-server.port=8090
+server.port=8095
 server.servlet.context-path=/api
 
 # PostgreSQL Database Configuration
@@ -453,7 +474,7 @@ migration.default.commit-interval=10000
 Create `frontend/.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8090/api
+NEXT_PUBLIC_API_URL=http://localhost:8095/api
 ```
 
 ### Docker Configuration
@@ -698,6 +719,220 @@ When editing column mappings:
 - **Truncate Before Insert**: Clears data but keeps table structure
 - **Auto Commit**: Enable for immediate commits, disable for batch commits
 
+### PG2PG Pipeline Setup
+
+The PG2PG (PostgreSQL to PostgreSQL) feature allows you to create data migration pipelines between PostgreSQL databases with advanced transformation capabilities.
+
+#### Creating a Pipeline Manually
+
+1. **Navigate to PG2PG Pipeline**:
+   - Click "PG2PG Pipeline" in the sidebar
+   - Click "New Pipeline" to create a new pipeline
+   - Enter pipeline name and description
+
+2. **Configure Connections**:
+   - Go to "Connections" tab
+   - **Source (PostgreSQL)**: Configure source database connection
+   - **Target (PostgreSQL)**: Configure target database connection
+   - Test both connections to ensure they work
+
+3. **Add Pipeline Steps**:
+   - Go to "Steps" tab
+   - Click the "+" button to add a new step
+   - Configure step details:
+     - **Source Schema/Table**: Select source table
+     - **Target Schema/Table**: Specify target table name
+     - **Description**: Add step description
+   - Configure column mappings:
+     - Click "Edit" on a step to open the mapping editor
+     - Map source columns to target columns
+     - Set data types for target columns
+     - Add transformation expressions:
+       - **Direct**: Direct column copy
+       - **Static**: Constant value
+       - **Function**: SQL function call
+       - **Case-When**: Conditional logic
+       - **Subquery**: Subquery transformation
+       - **Type-Cast**: Data type conversion
+       - **Concat**: String concatenation
+   - Configure filters:
+     - Enable filter if needed
+     - Add WHERE clause condition
+     - Add filter description
+   - Configure options:
+     - **Disable Triggers**: Disable triggers during migration
+     - **Disable Constraints**: Disable constraints during migration
+
+4. **Save and Execute**:
+   - Click "Save" to save pipeline configuration
+   - Click "Start Pipeline" to begin execution
+   - Monitor progress in the "Logs" tab
+
+#### Importing Pipeline from JSON
+
+You can import pipeline steps from a JSON configuration file:
+
+1. **Prepare JSON File**:
+   Create a JSON file with the following structure:
+   ```json
+   {
+     "source_table": "source_table_name",
+     "source_schema": "source_schema",
+     "target_table": "target_table_name",
+     "target_schema": "target_schema",
+     "description": "Step description",
+     "filter": {
+       "enabled": true,
+       "where_clause": "column = 'value'",
+       "description": "Filter description"
+     },
+     "options": {
+       "disable_triggers": true,
+       "disable_constraints": true
+     },
+     "column_mappings": {
+       "source_column": {
+         "target_column": "target_column_name",
+         "target_type": "VARCHAR(255)",
+         "description": "Column description",
+         "transformation": "optional SQL expression"
+       }
+     },
+     "indexes": [
+       {
+         "name": "idx_name",
+         "columns": ["column1", "column2"],
+         "type": "INDEX"
+       }
+     ],
+     "constraints": []
+   }
+   ```
+
+2. **Import JSON**:
+   - Open your pipeline in the builder
+   - Click "Import JSON" button
+   - Select your JSON file
+   - The system will:
+     - Parse the JSON configuration
+     - Create a new pipeline step
+     - Map all columns and transformations
+     - Save to the database
+
+3. **Review and Edit**:
+   - Review the imported step
+   - Edit any mappings or transformations as needed
+   - Save the pipeline
+
+#### Pipeline Step Configuration
+
+**Column Transformations**:
+- **Direct**: `source_column` → Direct copy
+- **Static**: `'constant_value'` → Fixed value
+- **Function**: `function_name(column)` → Function call
+- **Case-When**: `CASE WHEN condition THEN value ELSE other END`
+- **Subquery**: `(SELECT ... FROM ... WHERE ...)`
+- **Type-Cast**: `column::target_type`
+- **Concat**: `column1 || ' ' || column2`
+
+**Example Transformations**:
+```sql
+-- Static value
+'ACTIVE'
+
+-- Case-When
+CASE WHEN status = 'A' THEN 'ACTIVE' ELSE 'INACTIVE' END
+
+-- Subquery lookup
+(SELECT name FROM lookup_table WHERE id = source.id)
+
+-- Function call
+UPPER(source_column)
+
+-- Type conversion
+source_column::VARCHAR(50)
+```
+
+### Data Type Rule Configuration
+
+Configure custom Oracle to PostgreSQL data type mapping rules:
+
+1. **Access Data Type Rules**:
+   - Navigate to "Data Type Rules" from the sidebar
+   - View all default and custom mapping rules
+
+2. **View Rules**:
+   - Browse default system rules (30+ mappings)
+   - Filter by category (Numeric, Character, Date/Time, Binary, Other)
+   - Search for specific data types
+
+3. **Create Custom Rule**:
+   - Click "Add Custom Rule" button
+   - Fill in the form:
+     - **Oracle Type**: The Oracle data type (e.g., `VARCHAR2(255)`)
+     - **PostgreSQL Type**: Target PostgreSQL type (e.g., `VARCHAR(255)`)
+     - **Description**: Rule description
+     - **Transformation Hint**: Optional hint about data transformation
+   - Click "Create Rule"
+   - Custom rules take precedence over defaults
+
+4. **Edit Custom Rule**:
+   - Click "Edit" on a custom rule
+   - Modify the mapping configuration
+   - Click "Update Rule"
+   - Note: System default rules cannot be edited
+
+5. **Delete Custom Rule**:
+   - Click the delete icon on a custom rule
+   - Confirm deletion
+   - The system will fall back to default rules
+
+**Rule Precedence**:
+- Custom user rules override system defaults
+- Rules are matched by Oracle type name
+- First matching rule is used
+
+### Export Migration Logs
+
+Export migration logs to CSV or Excel for analysis and reporting:
+
+1. **Access Migration Logs**:
+   - Navigate to "Migration Execution" tab
+   - View real-time migration logs in the log panel
+
+2. **Export Options**:
+   - Click "Export Log" dropdown button
+   - Choose export format:
+     - **Export as Excel (.xlsx)**: Formatted Excel file with colors
+     - **Export as CSV (.csv)**: Comma-separated values file
+
+3. **Excel Export Features**:
+   - Color-coded log levels:
+     - **Error**: Red background
+     - **Warning**: Yellow background
+     - **Success**: Green background
+     - **Info**: Light blue background
+   - Formatted headers with borders
+   - Auto-sized columns
+   - All log details included
+
+4. **CSV Export Features**:
+   - UTF-8 encoding with BOM (Excel compatible)
+   - Proper CSV escaping for special characters
+   - Chronological ordering (oldest to newest)
+   - All columns: Timestamp, Level, Message, Details
+
+5. **File Download**:
+   - File automatically downloads to your browser
+   - Filename format: `migration_logs_{projectId}.{csv|xlsx}`
+   - Open in Excel, Google Sheets, or any CSV viewer
+
+**Export Contents**:
+- **Timestamp**: When the log entry was created
+- **Level**: Log level (info, warning, error, success)
+- **Message**: Log message
+- **Details**: Additional log details (if available)
+
 ## 📡 API Documentation
 
 ### Authentication Endpoints
@@ -884,7 +1119,165 @@ Update application settings.
 
 **Request**: AppSettings object
 
+### PG2PG Pipeline Endpoints (Protected)
+
+#### GET `/api/pg2pg/pipelines`
+Get all pipelines for the authenticated user.
+
+**Headers**: `Authorization: Bearer <token>`
+
+**Response**: Array of Pipeline objects
+
+#### GET `/api/pg2pg/pipelines/{id}`
+Get pipeline details by ID.
+
+#### POST `/api/pg2pg/pipelines`
+Create a new pipeline.
+
+**Request**:
+```json
+{
+  "name": "Pipeline Name",
+  "description": "Pipeline Description"
+}
+```
+
+#### PUT `/api/pg2pg/pipelines/{id}`
+Update pipeline configuration.
+
+#### DELETE `/api/pg2pg/pipelines/{id}`
+Delete pipeline.
+
+#### POST `/api/pg2pg/pipelines/{pipelineId}/steps`
+Add a step to pipeline.
+
+**Request**: PipelineStep object with column mappings
+
+#### POST `/api/pg2pg/pipelines/{pipelineId}/import-json`
+Import pipeline step from JSON file.
+
+**Request**: `multipart/form-data` with `file` field containing JSON
+
+**Response**: Created PipelineStep object
+
+**Example JSON Structure**:
+```json
+{
+  "source_table": "source_table",
+  "source_schema": "schema",
+  "target_table": "target_table",
+  "target_schema": "schema",
+  "description": "Step description",
+  "filter": {
+    "enabled": true,
+    "where_clause": "column = 'value'"
+  },
+  "options": {
+    "disable_triggers": true,
+    "disable_constraints": true
+  },
+  "column_mappings": {
+    "source_column": {
+      "target_column": "target_column",
+      "target_type": "VARCHAR(255)",
+      "transformation": "optional SQL expression"
+    }
+  }
+}
+```
+
+#### PUT `/api/pg2pg/pipelines/steps/{stepId}`
+Update a pipeline step.
+
+#### DELETE `/api/pg2pg/pipelines/steps/{stepId}`
+Delete a pipeline step.
+
+#### POST `/api/pg2pg/pipelines/{pipelineId}/connections/{type}`
+Save pipeline connection (source or target).
+
+**Path Parameters**:
+- `type`: `source` or `target`
+
+#### POST `/api/pg2pg/pipelines/{pipelineId}/start`
+Start pipeline execution.
+
+#### POST `/api/pg2pg/pipelines/{pipelineId}/stop`
+Stop/pause pipeline execution.
+
+#### GET `/api/pg2pg/pipelines/{pipelineId}/logs`
+Get pipeline execution logs.
+
+**Query Parameters**:
+- `executionId` (optional): Filter by execution ID
+
+#### GET `/api/pg2pg/pipelines/{pipelineId}/executions`
+Get all executions for a pipeline.
+
+### Data Type Mapping Rules Endpoints (Protected)
+
+#### GET `/api/data-type-rules`
+Get all mapping rules (custom + defaults) for the authenticated user.
+
+**Response**: Array of DataTypeMappingRule objects
+
+#### GET `/api/data-type-rules/custom`
+Get only custom rules for the authenticated user.
+
+#### GET `/api/data-type-rules/defaults`
+Get system default rules.
+
+#### POST `/api/data-type-rules`
+Create a custom mapping rule.
+
+**Request**:
+```json
+{
+  "oracleType": "VARCHAR2(255)",
+  "postgresType": "VARCHAR(255)",
+  "description": "Variable-length string",
+  "transformationHint": "Optional transformation hint"
+}
+```
+
+#### PUT `/api/data-type-rules/{id}`
+Update a custom mapping rule.
+
+**Request**: DataTypeMappingRule object
+
+#### DELETE `/api/data-type-rules/{id}`
+Delete a custom mapping rule.
+
+### Migration Log Export Endpoints (Protected)
+
+#### GET `/api/migration/logs/{projectId}/export/csv`
+Export migration logs to CSV format.
+
+**Response**: CSV file download with UTF-8 BOM
+
+**Content-Type**: `text/csv; charset=UTF-8`
+
+**Filename**: `migration_logs_{projectId}.csv`
+
+#### GET `/api/migration/logs/{projectId}/export/excel`
+Export migration logs to Excel format.
+
+**Response**: Excel (.xlsx) file download
+
+**Content-Type**: `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`
+
+**Filename**: `migration_logs_{projectId}.xlsx`
+
+**Features**:
+- Color-coded log levels
+- Formatted headers
+- Auto-sized columns
+- All log details included
+
 ## 🔄 Data Type Mappings
+
+The application provides both default and customizable data type mapping rules. Default rules are automatically initialized, and users can create custom rules to override defaults.
+
+### Default Mappings
 
 The application automatically maps Oracle data types to PostgreSQL:
 
@@ -925,6 +1318,21 @@ The application automatically maps Oracle data types to PostgreSQL:
 - **VARCHAR without length**: Maps to TEXT for PostgreSQL compatibility
 - **NUMBER without precision**: Maps to NUMERIC without constraints
 
+### Custom Mapping Rules
+
+Users can create custom data type mapping rules that override system defaults:
+
+1. **Rule Priority**: Custom rules take precedence over defaults
+2. **User-Specific**: Each user can have their own custom rules
+3. **Rule Matching**: Rules are matched by Oracle type name
+4. **Edit/Delete**: Custom rules can be edited or deleted; defaults are read-only
+
+**Example Custom Rule**:
+- Oracle Type: `CUSTOM_TYPE`
+- PostgreSQL Type: `TEXT`
+- Description: "Custom type mapping"
+- Transformation Hint: "May require data validation"
+
 ## 🐛 Troubleshooting
 
 ### Common Issues
@@ -935,12 +1343,12 @@ The application automatically maps Oracle data types to PostgreSQL:
    ```bash
    # Windows
    netstat -ano | findstr :3000
-   netstat -ano | findstr :8090
+   netstat -ano | findstr :8095
    netstat -ano | findstr :5432
    
    # Linux/Mac
    lsof -i :3000
-   lsof -i :8090
+   lsof -i :8095
    lsof -i :5432
    ```
 
@@ -969,7 +1377,7 @@ The application automatically maps Oracle data types to PostgreSQL:
 
 1. **Verify backend is running**:
    ```bash
-   curl http://localhost:8090/api/auth/login
+   curl http://localhost:8095/api/auth/login
    ```
 
 2. **Check CORS configuration** in `application.properties`

@@ -6,11 +6,15 @@ import com.ora2pg.migration.model.pg2pg.Pipeline;
 import com.ora2pg.migration.model.pg2pg.PipelineExecution;
 import com.ora2pg.migration.model.pg2pg.PipelineStep;
 import com.ora2pg.migration.service.Pg2PgPipelineService;
+import com.ora2pg.migration.service.Pg2PgJsonImportService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +26,7 @@ import java.util.Map;
 public class Pg2PgPipelineController {
     
     private final Pg2PgPipelineService pipelineService;
+    private final Pg2PgJsonImportService jsonImportService;
     
     @GetMapping
     public ResponseEntity<List<Pipeline>> getAllPipelines() {
@@ -112,10 +117,14 @@ public class Pg2PgPipelineController {
     }
     
     @DeleteMapping("/steps/{stepId}")
-    public ResponseEntity<Void> deleteStep(@PathVariable String stepId) {
+    public ResponseEntity<Map<String, Object>> deleteStep(@PathVariable String stepId) {
         try {
             pipelineService.deleteStep(stepId);
-            return ResponseEntity.noContent().build();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Step has been deleted");
+            response.put("success", true);
+            return ResponseEntity.ok().body(response);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {
@@ -190,6 +199,53 @@ public class Pg2PgPipelineController {
         try {
             List<com.ora2pg.migration.model.pg2pg.PipelineExecution> executions = pipelineService.getExecutions(pipelineId);
             return ResponseEntity.ok(executions);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    /**
+     * Import JSON mapping file and convert to PipelineStep
+     */
+    @PostMapping("/{pipelineId}/import-json")
+    public ResponseEntity<PipelineStep> importJsonMapping(
+            @PathVariable String pipelineId,
+            @RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest().build();
+            }
+            
+            String jsonContent = new String(file.getBytes(), StandardCharsets.UTF_8);
+            PipelineStep step = jsonImportService.convertJsonToPipelineStep(jsonContent);
+            step.setPipelineId(pipelineId);
+            
+            // Add step to pipeline
+            PipelineStep created = pipelineService.addStepToPipeline(pipelineId, step);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+    
+    /**
+     * Import JSON mapping from request body
+     */
+    @PostMapping("/{pipelineId}/import-json-body")
+    public ResponseEntity<PipelineStep> importJsonMappingFromBody(
+            @PathVariable String pipelineId,
+            @RequestBody String jsonContent) {
+        try {
+            PipelineStep step = jsonImportService.convertJsonToPipelineStep(jsonContent);
+            step.setPipelineId(pipelineId);
+            
+            // Add step to pipeline
+            PipelineStep created = pipelineService.addStepToPipeline(pipelineId, step);
+            return ResponseEntity.status(HttpStatus.CREATED).body(created);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.notFound().build();
         } catch (Exception e) {

@@ -20,7 +20,7 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 
 # Expose port
-EXPOSE 8090
+EXPOSE 8095
 
 # Run the application
 ENTRYPOINT ["java", "-jar", "app.jar", "--spring.profiles.active=docker"]

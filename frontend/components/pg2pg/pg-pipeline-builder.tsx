@@ -13,6 +13,7 @@ import MappingEditor from "./pg-mapping-editor"
 import PipelineExecutor from "./pg-pipeline-executor"
 import PipelineConnectionConfig from "./pg-pipeline-connection-config"
 import PipelineLogsView from "./pg-pipeline-logs-view"
+import JsonImportDialog from "./json-import-dialog"
 
 interface PGPipelineBuilderProps {
     pipelineId: string
@@ -224,66 +225,76 @@ export default function PGPipelineBuilder({ pipelineId, onBack }: PGPipelineBuil
                 </TabsList>
 
                 <TabsContent value="steps" className="space-y-4">
-                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 h-[calc(100vh-280px)]">
                         {/* Pipeline Steps */}
-                        <div className="lg:col-span-1 space-y-2">
-                            <div className="flex items-center justify-between">
+                        <div className="lg:col-span-1 space-y-2 flex flex-col">
+                            <div className="flex items-center justify-between flex-shrink-0">
                                 <h3 className="text-sm font-semibold text-foreground/80">Pipeline Steps ({steps.length})</h3>
-                                <Button onClick={addStep} variant="outline" size="sm">
-                                    <Plus className="h-4 w-4" />
-                                </Button>
+                                <div className="flex gap-2">
+                                    <JsonImportDialog 
+                                        pipelineId={pipelineId} 
+                                        onImportSuccess={loadPipeline}
+                                    />
+                                    <Button onClick={addStep} variant="outline" size="sm">
+                                        <Plus className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </div>
-                            <div className="space-y-2 max-h-96 overflow-y-auto">
-                                {steps.map((step, idx) => (
-                                    <div key={step.id}>
-                                        <button
-                                            onClick={() => setSelectedStep(step)}
-                                            className={cn(
-                                                "w-full px-3 py-2 rounded-lg text-left text-sm transition-all",
-                                                selectedStep?.id === step.id
-                                                    ? "bg-accent/20 border border-accent/50 text-foreground"
-                                                    : "border border-transparent hover:bg-background/80 text-foreground/70",
-                                            )}
-                                        >
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex-1">
-                                                    <div className="font-mono text-xs text-accent">Step {step.order}</div>
-                                                    <div className="truncate font-medium">{step.sourceTable || "New Step"}</div>
-                                                    <div className="text-xs text-foreground/50">
-                                                        {step.targetSchema}.{step.targetTable}
+                            <div className="space-y-2 flex-1 overflow-y-auto min-h-0">
+                                {steps.map((step, idx) => {
+                                    const stepNumber = step.order != null && step.order > 0 ? step.order : idx + 1;
+                                    return (
+                                        <div key={step.id}>
+                                            <button
+                                                onClick={() => setSelectedStep(step)}
+                                                className={cn(
+                                                    "w-full px-3 py-2 rounded-lg text-left text-sm transition-all",
+                                                    selectedStep?.id === step.id
+                                                        ? "bg-accent/20 border border-accent/50 text-foreground"
+                                                        : "border border-transparent hover:bg-background/80 text-foreground/70",
+                                                )}
+                                            >
+                                                <div className="flex items-start justify-between">
+                                                    <div className="flex-1">
+                                                        <div className="font-mono text-xs text-accent">Step {stepNumber}</div>
+                                                        <div className="truncate font-medium">{step.sourceTable || "New Step"}</div>
+                                                        <div className="text-xs text-foreground/50">
+                                                            {step.targetSchema}.{step.targetTable}
+                                                        </div>
                                                     </div>
+                                                    <div
+                                                        className={cn(
+                                                            "w-2 h-2 rounded-full mt-1 flex-shrink-0",
+                                                            step.status === "configured" && "bg-blue-500",
+                                                            step.status === "executing" && "bg-yellow-500",
+                                                            step.status === "completed" && "bg-green-500",
+                                                            step.status === "error" && "bg-red-500",
+                                                            (!step.status || step.status === "draft") && "bg-gray-400",
+                                                        )}
+                                                    />
                                                 </div>
-                                                <div
-                                                    className={cn(
-                                                        "w-2 h-2 rounded-full mt-1",
-                                                        step.status === "configured" && "bg-blue-500",
-                                                        step.status === "executing" && "bg-yellow-500",
-                                                        step.status === "completed" && "bg-green-500",
-                                                        step.status === "error" && "bg-red-500",
-                                                    )}
-                                                />
-                                            </div>
-                                        </button>
-                                        {idx < steps.length - 1 && (
-                                            <div className="flex justify-center py-1">
-                                                <ChevronRight className="h-4 w-4 text-foreground/30 rotate-90" />
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
+                                            </button>
+                                            {idx < steps.length - 1 && (
+                                                <div className="flex justify-center py-1">
+                                                    <ChevronRight className="h-4 w-4 text-foreground/30 rotate-90" />
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </div>
 
                         {/* Step Details & Editor */}
-                        <div className="lg:col-span-2">
+                        <div className="lg:col-span-2 flex flex-col min-h-0">
                             {selectedStep ? (
                                 <>
                                     {!showEditor ? (
-                                        <Card className="border-accent/30 bg-background/60 backdrop-blur-sm">
-                                            <CardHeader>
+                                        <Card className="border-accent/30 bg-background/60 backdrop-blur-sm flex flex-col h-full">
+                                            <CardHeader className="flex-shrink-0">
                                                 <div className="flex items-center justify-between">
                                                     <div>
-                                                        <CardTitle>Step {selectedStep.order}</CardTitle>
+                                                        <CardTitle>Step {selectedStep.order != null && selectedStep.order > 0 ? selectedStep.order : (steps.findIndex(s => s.id === selectedStep.id) + 1)}</CardTitle>
                                                         <CardDescription>{selectedStep.description || "No description"}</CardDescription>
                                                     </div>
                                                     <div className="flex gap-2">
@@ -296,8 +307,8 @@ export default function PGPipelineBuilder({ pipelineId, onBack }: PGPipelineBuil
                                                     </div>
                                                 </div>
                                             </CardHeader>
-                                            <CardContent className="space-y-4">
-                                                <div className="grid grid-cols-2 gap-4">
+                                            <CardContent className="space-y-4 flex-1 flex flex-col min-h-0 overflow-hidden">
+                                                <div className="grid grid-cols-2 gap-4 flex-shrink-0">
                                                     <div>
                                                         <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">Source</label>
                                                         <div className="font-mono text-sm mt-1">
@@ -313,7 +324,7 @@ export default function PGPipelineBuilder({ pipelineId, onBack }: PGPipelineBuil
                                                 </div>
 
                                                 {selectedStep.filter?.enabled && (
-                                                    <div className="border-t border-foreground/10 pt-4">
+                                                    <div className="border-t border-foreground/10 pt-4 flex-shrink-0">
                                                         <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider">Filter</label>
                                                         <code className="block text-xs bg-background border border-foreground/10 rounded p-2 mt-1 text-accent overflow-x-auto">
                                                             WHERE {selectedStep.filter.whereClause}
@@ -321,19 +332,22 @@ export default function PGPipelineBuilder({ pipelineId, onBack }: PGPipelineBuil
                                                     </div>
                                                 )}
 
-                                                <div className="border-t border-foreground/10 pt-4">
-                                                    <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-2 block">
+                                                <div className="border-t border-foreground/10 pt-4 flex-1 flex flex-col min-h-0">
+                                                    <label className="text-xs font-semibold text-foreground/60 uppercase tracking-wider mb-2 block flex-shrink-0">
                                                         Column Mappings ({selectedStep.columnMappings?.length || 0})
                                                     </label>
                                                     {!selectedStep.columnMappings || selectedStep.columnMappings.length === 0 ? (
                                                         <p className="text-sm text-foreground/50 italic">No columns mapped yet</p>
                                                     ) : (
-                                                        <div className="space-y-1 max-h-32 overflow-y-auto">
+                                                        <div className="space-y-1 flex-1 overflow-y-auto min-h-0 pr-2">
                                                             {selectedStep.columnMappings.map((col) => (
-                                                                <div key={col.id} className="text-xs bg-background border border-foreground/5 rounded p-1 pl-2">
-                                                                    <span className="text-accent">{col.sourceColumn}</span>
+                                                                <div key={col.id} className="text-xs bg-background border border-foreground/5 rounded p-1.5 pl-2 mb-1">
+                                                                    <span className="text-accent font-medium">{col.sourceColumn}</span>
                                                                     <span className="text-foreground/50 mx-1">→</span>
-                                                                    <span>{col.targetColumn}</span>
+                                                                    <span className="font-medium">{col.targetColumn}</span>
+                                                                    {col.transformation && col.transformation !== col.sourceColumn && (
+                                                                        <span className="text-foreground/40 text-[10px] ml-2 italic">({col.transformationType || 'transformed'})</span>
+                                                                    )}
                                                                 </div>
                                                             ))}
                                                         </div>
@@ -342,15 +356,17 @@ export default function PGPipelineBuilder({ pipelineId, onBack }: PGPipelineBuil
                                             </CardContent>
                                         </Card>
                                     ) : (
-                                        <MappingEditor
-                                            step={selectedStep}
-                                            onSave={(updated) => updateStep(updated)}
-                                            onCancel={() => setShowEditor(false)}
-                                        />
+                                        <div className="h-full">
+                                            <MappingEditor
+                                                step={selectedStep}
+                                                onSave={(updated) => updateStep(updated)}
+                                                onCancel={() => setShowEditor(false)}
+                                            />
+                                        </div>
                                     )}
                                 </>
                             ) : (
-                                <Card className="border-accent/30 bg-background/60 backdrop-blur-sm">
+                                <Card className="border-accent/30 bg-background/60 backdrop-blur-sm h-full flex items-center justify-center">
                                     <CardContent className="pt-8 text-center">
                                         <p className="text-foreground/50">Select a step to view details</p>
                                     </CardContent>

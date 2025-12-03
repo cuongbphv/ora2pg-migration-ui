@@ -11,6 +11,7 @@ import java.util.List;
 public interface MigrationLogRepository extends JpaRepository<MigrationLogEntity, String> {
     List<MigrationLogEntity> findByProjectOrderByTimestampDesc(ProjectEntity project);
     List<MigrationLogEntity> findByProjectIdOrderByTimestampDesc(String projectId);
+    List<MigrationLogEntity> findByProjectIdOrderByTimestampAsc(String projectId);
     void deleteByProject(ProjectEntity project);
 }
 

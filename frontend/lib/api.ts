@@ -5,7 +5,7 @@
  * To use this service, update the components to call these methods instead of using mock data.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8090/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8095/api';
 
 export interface ApiResponse<T> {
   data?: T | any;
@@ -250,6 +250,120 @@ class ApiService {
 
   async getPipelineExecutions(pipelineId: string) {
     return this.request(`/pg2pg/pipelines/${pipelineId}/executions`);
+  }
+
+  async importJsonMapping(pipelineId: string, file: File) {
+    const token = this.getToken();
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    // Don't set Content-Type - browser will set it with boundary for FormData
+    
+    const response = await fetch(`${API_BASE_URL}/pg2pg/pipelines/${pipelineId}/import-json`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        return { error: 'Authentication required' };
+      }
+      const error = await response.json().catch(() => ({ error: 'Request failed' }));
+      return { error: error.message || error.error || 'Request failed' };
+    }
+
+    const data = await response.json();
+    return { data };
+  }
+
+  async importJsonMappingFromBody(pipelineId: string, jsonContent: string) {
+    return this.request(`/pg2pg/pipelines/${pipelineId}/import-json-body`, {
+      method: 'POST',
+      body: jsonContent,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  // Data Type Mapping Rules
+  async getDataTypeRules() {
+    return this.request('/data-type-rules');
+  }
+
+  async getCustomDataTypeRules() {
+    return this.request('/data-type-rules/custom');
+  }
+
+  async getDefaultDataTypeRules() {
+    return this.request('/data-type-rules/defaults');
+  }
+
+  async createDataTypeRule(rule: any) {
+    return this.request('/data-type-rules', {
+      method: 'POST',
+      body: JSON.stringify(rule),
+    });
+  }
+
+  async updateDataTypeRule(id: string, rule: any) {
+    return this.request(`/data-type-rules/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(rule),
+    });
+  }
+
+  async deleteDataTypeRule(id: string) {
+    return this.request(`/data-type-rules/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Migration Log Export
+  async exportMigrationLogs(projectId: string, format: 'csv' | 'excel' = 'excel') {
+    const token = this.getToken();
+    const endpoint = format === 'csv' 
+      ? `/migration/logs/${projectId}/export/csv`
+      : `/migration/logs/${projectId}/export/excel`;
+    
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      method: 'GET',
+      headers,
+    });
+
+    if (!response.ok) {
+      if (response.status === 401) {
+        localStorage.removeItem('auth_token');
+        localStorage.removeItem('auth_user');
+        return { error: 'Authentication required' };
+      }
+      const error = await response.json().catch(() => ({ error: 'Export failed' }));
+      return { error: error.message || error.error || 'Export failed' };
+    }
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `migration_logs_${projectId}.${format === 'csv' ? 'csv' : 'xlsx'}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+
+    return { data: true };
   }
 }
 
