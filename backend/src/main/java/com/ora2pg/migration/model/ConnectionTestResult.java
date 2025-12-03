@@ -12,5 +12,7 @@ public class ConnectionTestResult {
     private String message;
     private String databaseVersion;
     private Long connectionTimeMs;
+    private String connectionString;
+    private Boolean isConnected;
 }
 

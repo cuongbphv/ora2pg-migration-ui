@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import type { TableMapping, ColumnMapping, Project } from "@/lib/types"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -54,6 +55,8 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
   const [autoMapping, setAutoMapping] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(50)
+  const [unsavedChanges, setUnsavedChanges] = useState<Set<string>>(new Set())
+  const [savingTableId, setSavingTableId] = useState<string | null>(null)
 
   // Load project and table mappings
   useEffect(() => {
@@ -75,6 +78,8 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
         setSelectedTables(
           mappings.filter((t) => t.enabled).map((t) => t.id)
         )
+        // Clear unsaved changes when loading fresh data
+        setUnsavedChanges(new Set())
       }
     } catch (error) {
       console.error("Failed to load project:", error)
@@ -83,7 +88,7 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
     }
   }
 
-  const saveTableMappings = async (updatedTables: TableMapping[]) => {
+  const saveTableMappings = useCallback(async (updatedTables: TableMapping[]) => {
     if (!projectId) return
     try {
       const result = await apiService.saveTableMappings(projectId, updatedTables)
@@ -97,7 +102,55 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
       console.error("Failed to save table mappings:", error)
       toast.error("Failed to save table mappings", "Please try again")
     }
-  }
+  }, [projectId])
+
+  // Update table metadata locally (without saving)
+  const updateTableMetadata = useCallback((tableId: string, updates: Partial<TableMapping>) => {
+    setTables((prevTables) => 
+      prevTables.map((t) => t.id === tableId ? { ...t, ...updates } : t)
+    )
+    // Mark as having unsaved changes
+    setUnsavedChanges((prev) => new Set(prev).add(tableId))
+  }, [])
+
+  // Save single table metadata
+  const saveTableMetadata = useCallback(async (tableId: string) => {
+    if (!projectId) return
+    
+    setSavingTableId(tableId)
+    try {
+      // Get current table from state
+      const tableToSave = tables.find(t => t.id === tableId)
+      if (!tableToSave) return
+
+      // Get all tables and update the one we're saving
+      const updatedTables = tables.map(t => 
+        t.id === tableId ? tableToSave : t
+      )
+      
+      const result = await apiService.saveTableMappings(projectId, updatedTables)
+      if (result.data) {
+        const projectData = result.data as Project
+        setProject(projectData)
+        const mappings = (projectData.tableMappings || []) as TableMapping[]
+        setTables(mappings)
+        
+        // Clear unsaved changes for this table
+        setUnsavedChanges((prev) => {
+          const newSet = new Set(prev)
+          newSet.delete(tableId)
+          return newSet
+        })
+        
+        toast.success("Table settings saved", "Migration options updated successfully")
+      }
+    } catch (error) {
+      console.error("Failed to save table metadata:", error)
+      toast.error("Failed to save table settings", "Please try again")
+    } finally {
+      setSavingTableId(null)
+    }
+  }, [projectId, tables])
 
   const handleDiscoverTables = async () => {
     if (!project || !project.sourceConnection || !project.sourceConnection.schema) {
@@ -891,27 +944,47 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
                   {/* Table Options: Filter, Drop, Truncate */}
                   {expandedTable === table.id && (
                     <div className="bg-muted/10 border-t border-border px-8 py-4 space-y-3">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                        Migration Options
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                          Migration Options
+                        </div>
                       </div>
                       
                       {/* Filter Condition */}
                       <div className="space-y-1">
                         <label className="text-xs font-medium text-foreground">Filter Condition (WHERE clause)</label>
-                        <Input
+                        <Textarea
                           placeholder="e.g., status = 'ACTIVE' AND created_date > '2024-01-01'"
                           value={table.filterCondition || ""}
                           onChange={(e) => {
-                            const updated = tables.map((t) =>
-                              t.id === table.id ? { ...t, filterCondition: e.target.value } : t
-                            )
-                            setTables(updated)
-                            saveTableMappings(updated)
+                            updateTableMetadata(table.id, { filterCondition: e.target.value })
                           }}
-                          className="h-8 text-xs font-mono bg-input"
+                          onKeyDown={(e) => {
+                            // Allow Tab key for SQL formatting
+                            if (e.key === 'Tab') {
+                              e.preventDefault()
+                              const textarea = e.currentTarget
+                              const start = textarea.selectionStart
+                              const end = textarea.selectionEnd
+                              const currentValue = table.filterCondition || ""
+                              
+                              // Insert 2 spaces (tab equivalent) at cursor position
+                              const newValue = currentValue.substring(0, start) + '  ' + currentValue.substring(end)
+                              
+                              // Update metadata
+                              updateTableMetadata(table.id, { filterCondition: newValue })
+                              
+                              // Set cursor position after inserted spaces (use setTimeout to ensure DOM is updated)
+                              setTimeout(() => {
+                                textarea.selectionStart = textarea.selectionEnd = start + 2
+                              }, 0)
+                            }
+                          }}
+                          className="min-h-[80px] text-xs font-mono bg-input resize-y font-mono"
+                          rows={4}
                         />
                         <p className="text-xs text-muted-foreground">
-                          Optional: Add WHERE clause to filter source data. Example: status = 'ACTIVE'
+                          Optional: Add WHERE clause to filter source data. Example: status = 'ACTIVE'. Press Tab for indentation.
                         </p>
                       </div>
                       
@@ -923,11 +996,10 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
                             id={`drop-${table.id}`}
                             checked={table.dropBeforeInsert || false}
                             onChange={(e) => {
-                              const updated = tables.map((t) =>
-                                t.id === table.id ? { ...t, dropBeforeInsert: e.target.checked, truncateBeforeInsert: e.target.checked ? false : t.truncateBeforeInsert } : t
-                              )
-                              setTables(updated)
-                              saveTableMappings(updated)
+                              updateTableMetadata(table.id, {
+                                dropBeforeInsert: e.target.checked,
+                                truncateBeforeInsert: e.target.checked ? false : table.truncateBeforeInsert
+                              })
                             }}
                             className="w-4 h-4 rounded border-input"
                           />
@@ -941,11 +1013,10 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
                             id={`truncate-${table.id}`}
                             checked={table.truncateBeforeInsert || false}
                             onChange={(e) => {
-                              const updated = tables.map((t) =>
-                                t.id === table.id ? { ...t, truncateBeforeInsert: e.target.checked, dropBeforeInsert: e.target.checked ? false : t.dropBeforeInsert } : t
-                              )
-                              setTables(updated)
-                              saveTableMappings(updated)
+                              updateTableMetadata(table.id, {
+                                truncateBeforeInsert: e.target.checked,
+                                dropBeforeInsert: e.target.checked ? false : table.dropBeforeInsert
+                              })
                             }}
                             className="w-4 h-4 rounded border-input"
                           />
@@ -957,6 +1028,32 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
                       <p className="text-xs text-muted-foreground">
                         Note: Drop removes the table completely. Truncate clears data but keeps the table structure.
                       </p>
+                      
+                      {/* Save Button - Right Bottom */}
+                      <div className="flex items-center justify-end gap-3 pt-2 border-t border-border/50">
+                        {unsavedChanges.has(table.id) && (
+                          <span className="text-xs text-warning">Unsaved changes</span>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => saveTableMetadata(table.id)}
+                          disabled={savingTableId === table.id || !unsavedChanges.has(table.id)}
+                          className="h-7 text-xs"
+                        >
+                          {savingTableId === table.id ? (
+                            <>
+                              <RefreshIcon className="w-3 h-3 mr-1 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <SaveIcon className="w-3 h-3 mr-1" />
+                              Save Settings
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </div>
                   )}
                   

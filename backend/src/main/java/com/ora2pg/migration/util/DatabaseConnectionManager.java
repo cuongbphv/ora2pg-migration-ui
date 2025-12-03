@@ -43,6 +43,7 @@ public class DatabaseConnectionManager {
                 // Oracle connection URL format: jdbc:oracle:thin:@host:port:database
                 url = String.format("jdbc:oracle:thin:@%s:%d:%s", 
                     config.getHost(), config.getPort(), config.getDatabase());
+                config.setConnectionString(url);
             }
             return DriverManager.getConnection(url, props);
             
@@ -53,6 +54,7 @@ public class DatabaseConnectionManager {
                 // PostgreSQL connection URL format: jdbc:postgresql://host:port/database
                 url = String.format("jdbc:postgresql://%s:%d/%s", 
                     config.getHost(), config.getPort(), config.getDatabase());
+                config.setConnectionString(url);
             }
             return DriverManager.getConnection(url, props);
         } else {
@@ -62,8 +64,11 @@ public class DatabaseConnectionManager {
     
     public boolean testConnection(ConnectionConfig config) {
         try (Connection conn = createConnection(config)) {
-            return conn.isValid(5);
+            boolean result = conn.isValid(5);
+            config.setIsConnected(result);
+            return result;
         } catch (SQLException e) {
+            config.setIsConnected(false);
             return false;
         }
     }

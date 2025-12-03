@@ -26,13 +26,16 @@ public class DatabaseService {
             
             if (isValid) {
                 String version = connectionManager.getDatabaseVersion(config);
-                return new ConnectionTestResult(true, "Connection successful", version, connectionTime);
+                return new ConnectionTestResult(true, "Connection successful", version, connectionTime,
+                        config.getConnectionString(), config.getIsConnected());
             } else {
-                return new ConnectionTestResult(false, "Connection failed", null, connectionTime);
+                return new ConnectionTestResult(false, "Connection failed", null,
+                        connectionTime, config.getConnectionString(), config.getIsConnected());
             }
         } catch (Exception e) {
             long connectionTime = System.currentTimeMillis() - startTime;
-            return new ConnectionTestResult(false, "Connection error: " + e.getMessage(), null, connectionTime);
+            return new ConnectionTestResult(false, "Connection error: " + e.getMessage(),
+                    null, connectionTime, config.getConnectionString(), config.getIsConnected());
         }
     }
     

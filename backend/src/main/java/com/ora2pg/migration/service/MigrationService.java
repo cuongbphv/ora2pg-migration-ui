@@ -18,6 +18,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -39,7 +40,15 @@ public class MigrationService {
     @Autowired
     private MigrationProgressRepository migrationProgressRepository;
     
+    @Autowired
+    private ProjectService projectService;
+    
+    @Autowired
+    private SettingsService settingsService;
+    
     private final ConcurrentHashMap<String, MigrationProgress> progressMap = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Thread> executionThreads = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, AtomicBoolean> pauseFlags = new ConcurrentHashMap<>();
     
     @Transactional
     public MigrationProgress startMigration(Project project, AppSettings settings) {
@@ -48,46 +57,236 @@ public class MigrationService {
         progress.setStartTime(LocalDateTime.now());
         progress.setTotalTables(project.getTableMappings().size());
         progress.setCompletedTables(0);
-        progress.setTotalRows(0L);
+        
+        // Calculate total rows from source tables (considering filter conditions)
+        long totalRows = calculateTotalRows(project);
+        progress.setTotalRows(totalRows);
         progress.setMigratedRows(0L);
         
         // Save to database
         saveProgressToDatabase(project.getId(), progress);
         
         progressMap.put(project.getId(), progress);
+        pauseFlags.put(project.getId(), new AtomicBoolean(false));
         
         // Start migration in background thread
-        new Thread(() -> executeMigration(project, settings, progress)).start();
+        Thread executionThread = new Thread(() -> executeMigration(project, settings, progress));
+        executionThread.setName("Migration-" + project.getId());
+        executionThreads.put(project.getId(), executionThread);
+        executionThread.start();
         
         return progress;
     }
     
-    private void executeMigration(Project project, AppSettings settings, MigrationProgress progress) {
-        try {
-            addLog(progress, "info", "Migration started", null);
-            
-            // Create target tables
-            createTargetTables(project, progress);
-            
-            // Migrate data
+    /**
+     * Calculate total rows to migrate from source tables, considering filter conditions
+     */
+    private long calculateTotalRows(Project project) {
+        long totalRows = 0L;
+        try (Connection sourceConn = connectionManager.getConnection(project.getSourceConnection())) {
             for (TableMapping tableMapping : project.getTableMappings()) {
                 if (!tableMapping.getEnabled()) {
                     continue;
+                }
+                
+                try {
+                    // Build COUNT query with filter condition
+                    String countSql = String.format("SELECT COUNT(*) FROM %s.%s",
+                        quoteIdentifier(tableMapping.getSourceSchema()),
+                        quoteIdentifier(tableMapping.getSourceTable()));
+                    
+                    // Add filter condition if specified
+                    if (tableMapping.getFilterCondition() != null && !tableMapping.getFilterCondition().trim().isEmpty()) {
+                        String filter = tableMapping.getFilterCondition().trim();
+                        if (!filter.toUpperCase().startsWith("WHERE")) {
+                            countSql += " WHERE " + filter;
+                        } else {
+                            countSql += " " + filter;
+                        }
+                    }
+                    
+                    try (Statement stmt = sourceConn.createStatement();
+                         ResultSet rs = stmt.executeQuery(countSql)) {
+                        if (rs.next()) {
+                            totalRows += rs.getLong(1);
+                        }
+                    }
+                } catch (SQLException e) {
+                    log.warn("Failed to count rows for table {}.{}: {}", 
+                        tableMapping.getSourceSchema(), tableMapping.getSourceTable(), e.getMessage());
+                    // Continue with other tables even if one fails
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to calculate total rows", e);
+        }
+        return totalRows;
+    }
+    
+    /**
+     * Count actual migrated rows in target database
+     * @param project The project
+     * @param targetConn Optional existing connection to reuse. If null, a new connection will be opened.
+     */
+    private long countMigratedRows(Project project, Connection targetConn) {
+        long migratedRows = 0L;
+        boolean shouldCloseConnection = false;
+        
+        try {
+            if (targetConn == null) {
+                targetConn = connectionManager.getConnection(project.getTargetConnection());
+                shouldCloseConnection = true;
+            }
+            
+            for (TableMapping tableMapping : project.getTableMappings()) {
+                if (!tableMapping.getEnabled()) {
+                    continue;
+                }
+                
+                // Only count rows for tables that have been migrated
+                if (!"migrated".equals(tableMapping.getStatus())) {
+                    continue;
+                }
+                
+                try {
+                    String countSql = String.format("SELECT COUNT(*) FROM %s.%s",
+                        quoteIdentifier(tableMapping.getTargetSchema()),
+                        quoteIdentifier(tableMapping.getTargetTable()));
+                    
+                    try (Statement stmt = targetConn.createStatement();
+                         ResultSet rs = stmt.executeQuery(countSql)) {
+                        if (rs.next()) {
+                            migratedRows += rs.getLong(1);
+                        }
+                    }
+                } catch (SQLException e) {
+                    log.warn("Failed to count migrated rows for table {}.{}: {}", 
+                        tableMapping.getTargetSchema(), tableMapping.getTargetTable(), e.getMessage());
+                    // Continue with other tables even if one fails
+                }
+            }
+        } catch (SQLException e) {
+            log.error("Failed to count migrated rows", e);
+        } finally {
+            if (shouldCloseConnection && targetConn != null) {
+                try {
+                    targetConn.close();
+                } catch (SQLException e) {
+                    log.warn("Failed to close connection", e);
+                }
+            }
+        }
+        return migratedRows;
+    }
+    
+    /**
+     * Count actual migrated rows in target database (opens new connection)
+     */
+    private long countMigratedRows(Project project) {
+        return countMigratedRows(project, null);
+    }
+    
+    /**
+     * Count rows for a specific table in target database
+     */
+    private long countTableRows(Connection targetConn, String schema, String tableName) {
+        try {
+            String countSql = String.format("SELECT COUNT(*) FROM %s.%s",
+                quoteIdentifier(schema),
+                quoteIdentifier(tableName));
+            
+            try (Statement stmt = targetConn.createStatement();
+                 ResultSet rs = stmt.executeQuery(countSql)) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+            }
+        } catch (SQLException e) {
+            log.warn("Failed to count rows for table {}.{}: {}", schema, tableName, e.getMessage());
+        }
+        return 0L;
+    }
+    
+    private void executeMigration(Project project, AppSettings settings, MigrationProgress progress) {
+        String projectId = project.getId();
+        AtomicBoolean pauseFlag = pauseFlags.get(projectId);
+        if (pauseFlag == null) {
+            pauseFlag = new AtomicBoolean(false);
+            pauseFlags.put(projectId, pauseFlag);
+        }
+        
+        try {
+            // Check if migration was already started (resume scenario)
+            boolean isResume = progress.getCompletedTables() > 0 || 
+                              project.getTableMappings().stream().anyMatch(t -> "migrated".equals(t.getStatus()));
+            
+            if (!isResume) {
+                addLog(progress, "info", "Migration started", null);
+                // Create target tables only on first start
+                createTargetTables(project, progress);
+            } else {
+                addLog(progress, "info", "Migration resumed from table " + (progress.getCompletedTables() + 1), null);
+            }
+            
+            // Migrate data - skip already completed tables
+            for (TableMapping tableMapping : project.getTableMappings()) {
+                if (!tableMapping.getEnabled()) {
+                    continue;
+                }
+                
+                // Skip already migrated tables
+                if ("migrated".equals(tableMapping.getStatus())) {
+                    continue;
+                }
+                
+                // Check for pause before each table
+                while (pauseFlag.get() && "paused".equals(progress.getStatus())) {
+                    try {
+                        Thread.sleep(100); // Wait 100ms and check again
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        progress.setStatus("error");
+                        saveProgressToDatabase(progress.getProjectId(), progress);
+                        addLog(progress, "error", "Migration interrupted", null);
+                        return;
+                    }
+                }
+                
+                // Check if status changed to error or completed
+                if (!"running".equals(progress.getStatus())) {
+                    break;
                 }
                 
                 progress.setCurrentTable(tableMapping.getSourceTable());
                 addLog(progress, "info", "Migrating table: " + tableMapping.getSourceTable(), null);
                 
                 try {
-                    migrateTable(project, tableMapping, settings, progress);
+                    migrateTable(project, tableMapping, settings, progress, pauseFlag);
                     
                     // Update table status to "migrated" after successful migration
                     tableMapping.setStatus("migrated");
                     updateTableMappingStatus(project.getId(), tableMapping.getId(), "migrated");
                     
                     progress.setCompletedTables(progress.getCompletedTables() + 1);
+                    // Note: migratedRows is updated within migrateTable() using the existing connection
                     saveProgressToDatabase(progress.getProjectId(), progress);
-                    addLog(progress, "success", "Completed table: " + tableMapping.getSourceTable(), null);
+                    
+                    // Count actual migrated rows for logging (using a new connection since migrateTable closed its connection)
+                    long actualMigratedRows = 0L;
+                    try {
+                        try (Connection targetConn = connectionManager.getConnection(project.getTargetConnection())) {
+                            actualMigratedRows = countTableRows(targetConn, 
+                                tableMapping.getTargetSchema(), 
+                                tableMapping.getTargetTable());
+                        }
+                    } catch (SQLException e) {
+                        log.warn("Failed to count migrated rows for table {}.{}: {}", 
+                            tableMapping.getTargetSchema(), tableMapping.getTargetTable(), e.getMessage());
+                    }
+                    
+                    addLog(progress, "success", 
+                        String.format("Completed table: %s (%d rows migrated)", 
+                            tableMapping.getSourceTable(), actualMigratedRows), null);
                 } catch (Exception e) {
                     // Update table status to "error" if migration fails
                     tableMapping.setStatus("error");
@@ -106,6 +305,9 @@ public class MigrationService {
             progress.setStatus("error");
             saveProgressToDatabase(progress.getProjectId(), progress);
             addLog(progress, "error", "Migration failed: " + e.getMessage(), e.toString());
+        } finally {
+            // Clean up thread reference
+            executionThreads.remove(projectId);
         }
     }
     
@@ -228,7 +430,7 @@ public class MigrationService {
     }
     
     private void migrateTable(Project project, TableMapping tableMapping, 
-                             AppSettings settings, MigrationProgress progress) throws SQLException {
+                             AppSettings settings, MigrationProgress progress, AtomicBoolean pauseFlag) throws SQLException {
         try (Connection sourceConn = connectionManager.getConnection(project.getSourceConnection());
              Connection targetConn = connectionManager.getConnection(project.getTargetConnection())) {
             
@@ -301,6 +503,21 @@ public class MigrationService {
                 long totalRows = 0;
                 
                 while (rs.next()) {
+                    // Check for pause during row processing
+                    while (pauseFlag != null && pauseFlag.get() && "paused".equals(progress.getStatus())) {
+                        try {
+                            Thread.sleep(100);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new SQLException("Migration interrupted", e);
+                        }
+                    }
+                    
+                    // Check if status changed
+                    if (!"running".equals(progress.getStatus())) {
+                        break;
+                    }
+                    
                     // Set parameters for INSERT
                     for (int i = 0; i < tableMapping.getColumnMappings().size(); i++) {
                         ColumnMapping col = tableMapping.getColumnMappings().get(i);
@@ -444,12 +661,27 @@ public class MigrationService {
                         }
                         rowCount = 0;
                         
-                        progress.setMigratedRows(progress.getMigratedRows() + batchSize);
+                        // Count actual migrated rows from target database for accuracy
+                        long actualMigratedRows = countTableRows(targetConn,
+                            tableMapping.getTargetSchema(),
+                            tableMapping.getTargetTable());
+                        // Update with actual count from database (reuse existing connection)
+                        progress.setMigratedRows(countMigratedRows(project, targetConn));
                     }
                     
                     if (totalRows % commitInterval == 0) {
-                        addLog(progress, "info", String.format("Migrated %d rows from %s", totalRows, tableMapping.getSourceTable()), null);
-                        log.info("Migrated {} rows from {}", totalRows, tableMapping.getSourceTable());
+                        // Count actual migrated rows for accurate logging (reuse existing connection)
+                        long actualMigratedRows = 0L;
+                        actualMigratedRows = countTableRows(targetConn,
+                            tableMapping.getTargetSchema(),
+                            tableMapping.getTargetTable());
+                        // Update progress with actual count (reuse existing connection)
+                        progress.setMigratedRows(countMigratedRows(project, targetConn));
+                        addLog(progress, "info", 
+                            String.format("Migrated %d rows from %s (total: %d)", 
+                                actualMigratedRows, tableMapping.getSourceTable(), totalRows), null);
+                        log.info("Migrated {} rows from {} (total processed: {})", 
+                            actualMigratedRows, tableMapping.getSourceTable(), totalRows);
                     }
                 }
                 
@@ -459,7 +691,12 @@ public class MigrationService {
                     if (!useAutoCommit) {
                         targetConn.commit();
                     }
-                    progress.setMigratedRows(progress.getMigratedRows() + rowCount);
+                    // Count actual migrated rows from target database for accuracy (reuse existing connection)
+                    long actualMigratedRows = countTableRows(targetConn,
+                        tableMapping.getTargetSchema(),
+                        tableMapping.getTargetTable());
+                    // Update with actual count from database (reuse existing connection)
+                    progress.setMigratedRows(countMigratedRows(project, targetConn));
                     // Periodically save progress to database
                     if (progress.getMigratedRows() % 10000 == 0) {
                         saveProgressToDatabase(progress.getProjectId(), progress);
@@ -507,10 +744,16 @@ public class MigrationService {
         if (progress == null) {
             // Try to load from database
             try {
-                ProjectEntity project = projectRepository.findById(projectId).orElse(null);
-                if (project != null) {
+                ProjectEntity projectEntity = projectRepository.findById(projectId).orElse(null);
+                if (projectEntity != null) {
+                    Project project = projectService.getProjectById(projectId);
+                    if (project == null) {
+                        progress = new MigrationProgress(projectId);
+                        return progress;
+                    }
+                    
                     MigrationProgressEntity entity = migrationProgressRepository
-                        .findByProject(project)
+                        .findByProject(projectEntity)
                         .orElse(null);
                     
                     if (entity != null) {
@@ -518,12 +761,23 @@ public class MigrationService {
                         progress = entityToModel(entity);
                     } else {
                         // No progress in DB, calculate from table mappings
-                        progress = calculateProgressFromTableMappings(project);
+                        progress = calculateProgressFromTableMappings(projectEntity);
+                    }
+                    
+                    // Refresh row counts from actual databases for accuracy
+                    try {
+                        long totalRows = calculateTotalRows(project);
+                        long migratedRows = countMigratedRows(project);
+                        progress.setTotalRows(totalRows);
+                        progress.setMigratedRows(migratedRows);
+                    } catch (Exception e) {
+                        log.warn("Failed to refresh row counts: {}", e.getMessage());
+                        // Keep existing counts if refresh fails
                     }
                     
                     // Load logs from database
                     List<MigrationLogEntity> logEntities = migrationLogRepository
-                        .findByProjectOrderByTimestampDesc(project);
+                        .findByProjectOrderByTimestampDesc(projectEntity);
                     progress.setLogs(logEntities.stream().map(this::toMigrationLog).collect(Collectors.toList()));
                 } else {
                     progress = new MigrationProgress(projectId);
@@ -531,6 +785,22 @@ public class MigrationService {
             } catch (Exception e) {
                 log.error("Failed to load migration progress from database", e);
                 progress = new MigrationProgress(projectId);
+            }
+        } else {
+            // Even if in memory, refresh row counts periodically for accuracy
+            // Only refresh if migration is not currently running (to avoid performance impact)
+            if (!"running".equals(progress.getStatus())) {
+                try {
+                    Project project = projectService.getProjectById(projectId);
+                    if (project != null) {
+                        long totalRows = calculateTotalRows(project);
+                        long migratedRows = countMigratedRows(project);
+                        progress.setTotalRows(totalRows);
+                        progress.setMigratedRows(migratedRows);
+                    }
+                } catch (Exception e) {
+                    // Silently fail - keep existing counts
+                }
             }
         }
         
@@ -540,22 +810,30 @@ public class MigrationService {
     private MigrationProgress calculateProgressFromTableMappings(ProjectEntity projectEntity) {
         MigrationProgress progress = new MigrationProgress(projectEntity.getId());
         
+        // Convert entity to model for calculations
+        Project project = projectService.getProjectById(projectEntity.getId());
+        if (project == null) {
+            return progress;
+        }
+        
         // Calculate from table mappings
         List<com.ora2pg.migration.entity.TableMappingEntity> tableMappings = 
             projectEntity.getTableMappings();
         
         int totalTables = tableMappings.size();
         int completedTables = 0;
-        long totalRows = 0L;
-        long migratedRows = 0L;
         
         for (com.ora2pg.migration.entity.TableMappingEntity mapping : tableMappings) {
             if ("migrated".equals(mapping.getStatus())) {
                 completedTables++;
             }
-            // Note: We don't have row counts in table mappings, so we can't calculate exact migrated rows
-            // This would require additional queries or storing row counts
         }
+        
+        // Calculate total rows from source (considering filter conditions)
+        long totalRows = calculateTotalRows(project);
+        
+        // Count actual migrated rows in target database
+        long migratedRows = countMigratedRows(project);
         
         progress.setTotalTables(totalTables);
         progress.setCompletedTables(completedTables);
@@ -575,7 +853,7 @@ public class MigrationService {
     }
     
     @Transactional
-    private void saveProgressToDatabase(String projectId, MigrationProgress progress) {
+    protected void saveProgressToDatabase(String projectId, MigrationProgress progress) {
         try {
             ProjectEntity project = projectRepository.findById(projectId).orElse(null);
             if (project == null) {
@@ -638,6 +916,16 @@ public class MigrationService {
         if (progress != null && "running".equals(progress.getStatus())) {
             progress.setStatus("paused");
             saveProgressToDatabase(projectId, progress);
+            
+            // Set pause flag
+            AtomicBoolean pauseFlag = pauseFlags.get(projectId);
+            if (pauseFlag == null) {
+                pauseFlag = new AtomicBoolean(true);
+                pauseFlags.put(projectId, pauseFlag);
+            } else {
+                pauseFlag.set(true);
+            }
+            
             addLog(progress, "info", "Migration paused", null);
         }
     }
@@ -649,9 +937,47 @@ public class MigrationService {
             progressMap.put(projectId, progress);
         }
         if (progress != null && "paused".equals(progress.getStatus())) {
-            progress.setStatus("running");
-            saveProgressToDatabase(projectId, progress);
-            addLog(progress, "info", "Migration resumed", null);
+            // Clear pause flag
+            AtomicBoolean pauseFlag = pauseFlags.get(projectId);
+            if (pauseFlag == null) {
+                pauseFlag = new AtomicBoolean(false);
+                pauseFlags.put(projectId, pauseFlag);
+            } else {
+                pauseFlag.set(false);
+            }
+            
+            // Check if execution thread is still alive
+            Thread executionThread = executionThreads.get(projectId);
+            if (executionThread == null || !executionThread.isAlive()) {
+                // Thread is not alive, need to restart migration from current position
+                try {
+                    Project project = projectService.getProjectById(projectId);
+                    if (project != null) {
+                        AppSettings settings = settingsService.getSettings();
+                        progress.setStatus("running");
+                        saveProgressToDatabase(projectId, progress);
+                        
+                        // Restart execution thread
+                        MigrationProgress finalProgress = progress;
+                        Thread newThread = new Thread(() -> executeMigration(project, settings, finalProgress));
+                        newThread.setName("Migration-" + projectId);
+                        executionThreads.put(projectId, newThread);
+                        newThread.start();
+                        
+                        addLog(progress, "info", "Migration resumed - execution thread restarted", null);
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to restart migration thread", e);
+                    progress.setStatus("error");
+                    saveProgressToDatabase(projectId, progress);
+                    addLog(progress, "error", "Failed to resume migration: " + e.getMessage(), null);
+                }
+            } else {
+                // Thread is alive, just change status
+                progress.setStatus("running");
+                saveProgressToDatabase(projectId, progress);
+                addLog(progress, "info", "Migration resumed", null);
+            }
         }
     }
     
