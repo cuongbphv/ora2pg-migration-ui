@@ -117,6 +117,11 @@ public class ProjectMapper {
         mapping.setFilterCondition(entity.getFilterCondition());
         mapping.setDropBeforeInsert(entity.getDropBeforeInsert());
         mapping.setTruncateBeforeInsert(entity.getTruncateBeforeInsert());
+        mapping.setPartitionColumn(entity.getPartitionColumn());
+        mapping.setChunkSize(entity.getChunkSize());
+        mapping.setChunkWorkers(entity.getChunkWorkers());
+        mapping.setPartitionMinValue(entity.getPartitionMinValue());
+        mapping.setPartitionMaxValue(entity.getPartitionMaxValue());
         
         if (entity.getColumnMappings() != null) {
             mapping.setColumnMappings(
@@ -143,6 +148,11 @@ public class ProjectMapper {
         entity.setFilterCondition(model.getFilterCondition());
         entity.setDropBeforeInsert(model.getDropBeforeInsert() != null ? model.getDropBeforeInsert() : false);
         entity.setTruncateBeforeInsert(model.getTruncateBeforeInsert() != null ? model.getTruncateBeforeInsert() : false);
+        entity.setPartitionColumn(model.getPartitionColumn());
+        entity.setChunkSize(model.getChunkSize());
+        entity.setChunkWorkers(model.getChunkWorkers());
+        entity.setPartitionMinValue(model.getPartitionMinValue());
+        entity.setPartitionMaxValue(model.getPartitionMaxValue());
         entity.setProject(project);
         
         if (model.getColumnMappings() != null) {

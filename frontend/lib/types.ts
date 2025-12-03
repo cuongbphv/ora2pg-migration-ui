@@ -34,6 +34,11 @@ export interface TableMapping {
   filterCondition?: string
   dropBeforeInsert?: boolean
   truncateBeforeInsert?: boolean
+  partitionColumn?: string
+  chunkSize?: number
+  chunkWorkers?: number
+  partitionMinValue?: string
+  partitionMaxValue?: string
 }
 
 export interface ColumnMapping {

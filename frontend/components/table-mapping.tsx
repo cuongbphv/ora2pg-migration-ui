@@ -112,6 +112,27 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
     // Mark as having unsaved changes
     setUnsavedChanges((prev) => new Set(prev).add(tableId))
   }, [])
+  
+  const handlePartitionColumnChange = useCallback(
+    (table: TableMapping, value: string) => {
+      if (value === "__none__") {
+        updateTableMetadata(table.id, {
+          partitionColumn: undefined,
+          chunkSize: undefined,
+          chunkWorkers: undefined,
+          partitionMinValue: undefined,
+          partitionMaxValue: undefined,
+        })
+      } else {
+        updateTableMetadata(table.id, {
+          partitionColumn: value,
+          chunkSize: table.chunkSize || 50000,
+          chunkWorkers: table.chunkWorkers && table.chunkWorkers > 0 ? table.chunkWorkers : 2,
+        })
+      }
+    },
+    [updateTableMetadata],
+  )
 
   // Save single table metadata
   const saveTableMetadata = useCallback(async (tableId: string) => {
@@ -405,6 +426,19 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
     
     return dataType
   }
+  
+  const isChunkableSourceType = (dataType?: string) => {
+    if (!dataType) return false
+    const normalized = dataType.toUpperCase()
+    return (
+      normalized.includes("NUMBER") ||
+      normalized.includes("NUMERIC") ||
+      normalized.includes("DECIMAL") ||
+      normalized.includes("INT") ||
+      normalized.includes("BIGINT") ||
+      normalized.includes("SMALLINT")
+    )
+  }
 
   const toggleTable = (id: string) => {
     const updated = tables.map((t) =>
@@ -684,7 +718,11 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
                   </p>
                 </div>
               ) : (
-                paginatedTables.map((table) => (
+                paginatedTables.map((table) => {
+                  const chunkableColumns = (table.columnMappings || []).filter((col) =>
+                    isChunkableSourceType(col.sourceDataType || col.targetDataType),
+                  )
+                  return (
                 <div key={table.id} className="border-b border-border last:border-b-0">
                   {/* Table Row */}
                   <div
@@ -988,6 +1026,123 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
                         </p>
                       </div>
                       
+                      {/* Parallel Chunking */}
+                      <div className="space-y-3 rounded-md border border-border/60 bg-background/40 p-4">
+                        <div>
+                          <p className="text-xs font-semibold text-foreground uppercase tracking-wide">Parallel Chunking</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            Split this table by a numeric partition column so multiple workers can migrate it in parallel.
+                          </p>
+                        </div>
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-foreground">Partition Column</label>
+                            <Select
+                              value={table.partitionColumn || "__none__"}
+                              onValueChange={(value) => handlePartitionColumnChange(table, value)}
+                              disabled={chunkableColumns.length === 0}
+                            >
+                              <SelectTrigger className="h-9 bg-input text-xs" aria-label="Partition column">
+                                <SelectValue placeholder="Select column" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__" className="text-xs">
+                                  Disable chunking
+                                </SelectItem>
+                                {chunkableColumns.map((col) => (
+                                  <SelectItem key={col.id} value={col.sourceColumn} className="text-xs font-mono">
+                                    {col.sourceColumn}{" "}
+                                    <span className="text-[11px] text-muted-foreground">
+                                      ({formatSourceDataType(
+                                        col.sourceDataType,
+                                        col.sourceDataLength,
+                                        col.sourceDataPrecision,
+                                        col.sourceDataScale,
+                                      )})
+                                    </span>
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {chunkableColumns.length === 0 && (
+                              <p className="text-[11px] text-muted-foreground">No numeric columns available for chunking.</p>
+                            )}
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-foreground">Chunk Size (ID range)</label>
+                            <Input
+                              type="number"
+                              min={1}
+                              step={1}
+                              disabled={!table.partitionColumn}
+                              value={table.chunkSize ?? ""}
+                              onChange={(e) =>
+                                updateTableMetadata(table.id, {
+                                  chunkSize: e.target.value ? Math.max(1, parseInt(e.target.value, 10)) : undefined,
+                                })
+                              }
+                              placeholder="50000"
+                              className="bg-input h-9 text-xs"
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                              Approximate number of ID values per chunk. Larger chunks reduce coordination overhead.
+                            </p>
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-xs font-medium text-foreground">Chunk Workers</label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={16}
+                              disabled={!table.partitionColumn}
+                              value={table.chunkWorkers ?? ""}
+                              onChange={(e) =>
+                                updateTableMetadata(table.id, {
+                                  chunkWorkers: e.target.value ? Math.max(1, parseInt(e.target.value, 10)) : undefined,
+                                })
+                              }
+                              placeholder="2"
+                              className="bg-input h-9 text-xs"
+                            />
+                            <p className="text-[11px] text-muted-foreground">
+                              Maximum concurrent chunk workers for this table (per-table parallelism).
+                            </p>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-foreground">Min Value (optional)</label>
+                              <Input
+                                type="number"
+                                disabled={!table.partitionColumn}
+                                value={table.partitionMinValue ?? ""}
+                                onChange={(e) =>
+                                  updateTableMetadata(table.id, {
+                                    partitionMinValue: e.target.value || undefined,
+                                  })
+                                }
+                                placeholder="Auto detect"
+                                className="bg-input h-9 text-xs"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-foreground">Max Value (optional)</label>
+                              <Input
+                                type="number"
+                                disabled={!table.partitionColumn}
+                                value={table.partitionMaxValue ?? ""}
+                                onChange={(e) =>
+                                  updateTableMetadata(table.id, {
+                                    partitionMaxValue: e.target.value || undefined,
+                                  })
+                                }
+                                placeholder="Auto detect"
+                                className="bg-input h-9 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
                       {/* Drop/Truncate Options */}
                       <div className="flex items-center gap-6">
                         <div className="flex items-center gap-2">
@@ -1064,7 +1219,8 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
                     </div>
                   )}
                 </div>
-                ))
+                )
+                })
               )}
             </div>
           </CardContent>

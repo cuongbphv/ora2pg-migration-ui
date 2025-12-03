@@ -22,6 +22,11 @@ public class TableMapping {
     private String filterCondition; // WHERE clause for filtering source data
     private Boolean dropBeforeInsert; // Drop table before migration
     private Boolean truncateBeforeInsert; // Truncate table before migration
+    private String partitionColumn; // Column to partition data
+    private Integer chunkSize; // Rows per chunk
+    private Integer chunkWorkers; // Workers per table
+    private String partitionMinValue; // Optional min bound
+    private String partitionMaxValue; // Optional max bound
     
     public TableMapping(String id, String sourceTable, String sourceSchema, String targetTable, String targetSchema) {
         this.id = id;

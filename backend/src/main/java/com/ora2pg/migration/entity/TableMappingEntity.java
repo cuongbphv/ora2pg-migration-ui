@@ -45,6 +45,21 @@ public class TableMappingEntity {
     @Column(nullable = false)
     private Boolean truncateBeforeInsert = false; // Truncate table before migration
     
+    @Column
+    private String partitionColumn; // Column used for chunk-based parallelism
+    
+    @Column
+    private Integer chunkSize; // Rows per chunk when partitioning
+    
+    @Column
+    private Integer chunkWorkers; // Parallel workers per table when partitioning
+    
+    @Column
+    private String partitionMinValue; // Optional lower bound for partition column
+    
+    @Column
+    private String partitionMaxValue; // Optional upper bound for partition column
+    
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
     private ProjectEntity project;

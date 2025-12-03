@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -55,6 +56,16 @@ public class MigrationService {
     private final ConcurrentHashMap<String, MigrationProgress> progressMap = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Thread> executionThreads = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, AtomicBoolean> pauseFlags = new ConcurrentHashMap<>();
+    
+    private static class ChunkRange {
+        private final long startInclusive;
+        private final long endInclusive;
+        
+        private ChunkRange(long startInclusive, long endInclusive) {
+            this.startInclusive = startInclusive;
+            this.endInclusive = endInclusive;
+        }
+    }
     
     @Transactional
     public MigrationProgress startMigration(Project project, AppSettings settings) {
@@ -122,6 +133,193 @@ public class MigrationService {
     private void setCurrentTable(MigrationProgress progress, String tableName) {
         synchronized (progress) {
             progress.setCurrentTable(tableName);
+        }
+    }
+    
+    private void prepareTableForMigration(Project project, TableMapping tableMapping, MigrationProgress progress) throws SQLException {
+        boolean drop = Boolean.TRUE.equals(tableMapping.getDropBeforeInsert());
+        boolean truncate = Boolean.TRUE.equals(tableMapping.getTruncateBeforeInsert());
+        if (!drop && !truncate) {
+            return;
+        }
+        
+        try (Connection targetConn = connectionManager.getConnection(project.getTargetConnection());
+             Statement stmt = targetConn.createStatement()) {
+            if (drop) {
+                String dropSql = String.format("DROP TABLE IF EXISTS %s.%s CASCADE",
+                    quoteIdentifier(tableMapping.getTargetSchema()),
+                    quoteIdentifier(tableMapping.getTargetTable()));
+                stmt.execute(dropSql);
+                addLog(progress, "info", "Dropped table: " + tableMapping.getTargetTable(), null);
+                
+                String createSql = generateCreateTableSql(tableMapping);
+                stmt.execute(createSql);
+                addLog(progress, "info", "Recreated table: " + tableMapping.getTargetTable(), null);
+            } else if (truncate) {
+                String truncateSql = String.format("TRUNCATE TABLE %s.%s",
+                    quoteIdentifier(tableMapping.getTargetSchema()),
+                    quoteIdentifier(tableMapping.getTargetTable()));
+                stmt.execute(truncateSql);
+                addLog(progress, "info", "Truncated table: " + tableMapping.getTargetTable(), null);
+            }
+        }
+    }
+    
+    private boolean shouldUseChunking(TableMapping tableMapping) {
+        return tableMapping.getPartitionColumn() != null &&
+            !tableMapping.getPartitionColumn().trim().isEmpty() &&
+            tableMapping.getChunkWorkers() != null && tableMapping.getChunkWorkers() > 1 &&
+            tableMapping.getChunkSize() != null && tableMapping.getChunkSize() > 0;
+    }
+    
+    private ColumnMapping findPartitionColumnMapping(TableMapping tableMapping) {
+        if (tableMapping.getColumnMappings() == null) {
+            return null;
+        }
+        String partitionColumn = tableMapping.getPartitionColumn();
+        if (partitionColumn == null) {
+            return null;
+        }
+        return tableMapping.getColumnMappings().stream()
+            .filter(cm -> cm.getSourceColumn() != null && cm.getSourceColumn().equalsIgnoreCase(partitionColumn))
+            .findFirst()
+            .orElse(null);
+    }
+    
+    private boolean isChunkableColumnType(String dataType) {
+        if (dataType == null) {
+            return false;
+        }
+        String normalized = dataType.toUpperCase();
+        return normalized.contains("INT") ||
+               normalized.contains("NUMBER") ||
+               normalized.contains("DECIMAL") ||
+               normalized.contains("NUMERIC") ||
+               normalized.contains("BIGINT") ||
+               normalized.contains("SMALLINT");
+    }
+    
+    private String normalizeFilterCondition(String filterCondition) {
+        if (filterCondition == null) {
+            return "";
+        }
+        String trimmed = filterCondition.trim();
+        if (trimmed.isEmpty()) {
+            return "";
+        }
+        String upper = trimmed.toUpperCase();
+        if (upper.startsWith("WHERE ")) {
+            return trimmed.substring(5).trim();
+        }
+        return trimmed;
+    }
+    
+    private String buildWhereClause(String filterCondition, String extraCondition) {
+        List<String> clauses = new ArrayList<>();
+        String normalizedFilter = normalizeFilterCondition(filterCondition);
+        if (!normalizedFilter.isEmpty()) {
+            clauses.add("(" + normalizedFilter + ")");
+        }
+        if (extraCondition != null && !extraCondition.trim().isEmpty()) {
+            clauses.add("(" + extraCondition + ")");
+        }
+        if (clauses.isEmpty()) {
+            return "";
+        }
+        return " WHERE " + String.join(" AND ", clauses);
+    }
+    
+    private Long parseLongSafe(String value) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
+    }
+    
+    private List<ChunkRange> buildChunkRanges(Project project, TableMapping tableMapping) throws SQLException {
+        if (tableMapping.getChunkSize() == null || tableMapping.getChunkSize() <= 0) {
+            return Collections.emptyList();
+        }
+        
+        Long minValue = parseLongSafe(tableMapping.getPartitionMinValue());
+        Long maxValue = parseLongSafe(tableMapping.getPartitionMaxValue());
+        
+        if (minValue == null || maxValue == null) {
+            Long[] bounds = fetchPartitionBounds(project, tableMapping);
+            if (minValue == null) {
+                minValue = bounds[0];
+            }
+            if (maxValue == null) {
+                maxValue = bounds[1];
+            }
+        }
+        
+        if (minValue == null || maxValue == null) {
+            return Collections.emptyList();
+        }
+        
+        if (maxValue < minValue) {
+            long tmp = maxValue;
+            maxValue = minValue;
+            minValue = tmp;
+        }
+        
+        long chunkSize = tableMapping.getChunkSize();
+        if (chunkSize <= 0) {
+            return Collections.emptyList();
+        }
+        
+        List<ChunkRange> ranges = new ArrayList<>();
+        for (long start = minValue; start <= maxValue; start += chunkSize) {
+            long end = Math.min(start + chunkSize - 1, maxValue);
+            ranges.add(new ChunkRange(start, end));
+        }
+        return ranges;
+    }
+    
+    private Long[] fetchPartitionBounds(Project project, TableMapping tableMapping) throws SQLException {
+        String partitionColumn = tableMapping.getPartitionColumn();
+        if (partitionColumn == null || partitionColumn.trim().isEmpty()) {
+            return new Long[]{null, null};
+        }
+        
+        String columnIdentifier = quoteIdentifier(partitionColumn);
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT MIN(").append(columnIdentifier).append(") AS min_val, MAX(")
+            .append(columnIdentifier).append(") AS max_val FROM ")
+            .append(quoteIdentifier(tableMapping.getSourceSchema()))
+            .append(".").append(quoteIdentifier(tableMapping.getSourceTable()));
+        sql.append(buildWhereClause(tableMapping.getFilterCondition(), null));
+        
+        try (Connection sourceConn = connectionManager.getConnection(project.getSourceConnection());
+             Statement stmt = sourceConn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql.toString())) {
+            
+            if (rs.next()) {
+                Long min = getLongValue(rs, 1);
+                Long max = getLongValue(rs, 2);
+                return new Long[]{min, max};
+            }
+        }
+        return new Long[]{null, null};
+    }
+    
+    private Long getLongValue(ResultSet rs, int index) throws SQLException {
+        Object value = rs.getObject(index);
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(value.toString());
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
     
@@ -272,7 +470,7 @@ public class MigrationService {
             for (TableMapping tableMapping : tablesToMigrate) {
                 futures.add(tableExecutor.submit(() -> {
                     try {
-                        processTableMigration(project, tableMapping, settings, progress, pauseFlag);
+                        processTableMigration(project, tableMapping, settings, progress, pauseFlag, isResume);
                     } catch (Exception e) {
                         throw new RuntimeException(e);
                     }
@@ -320,13 +518,36 @@ public class MigrationService {
                                        TableMapping tableMapping,
                                        AppSettings settings,
                                        MigrationProgress progress,
-                                       AtomicBoolean pauseFlag) throws Exception {
+                                       AtomicBoolean pauseFlag,
+                                       boolean isResume) throws Exception {
         waitForResume(progress, pauseFlag);
         setCurrentTable(progress, tableMapping.getSourceTable());
         addLog(progress, "info", "Migrating table: " + tableMapping.getSourceTable(), null);
         
         try {
-            long migratedRows = migrateTable(project, tableMapping, settings, progress, pauseFlag);
+            if (!isResume) {
+                prepareTableForMigration(project, tableMapping, progress);
+            }
+            long migratedRows;
+            boolean attemptChunking = shouldUseChunking(tableMapping);
+            ColumnMapping partitionMapping = attemptChunking ? findPartitionColumnMapping(tableMapping) : null;
+            boolean validChunkColumn = attemptChunking &&
+                partitionMapping != null &&
+                isChunkableColumnType(partitionMapping.getSourceDataType() != null
+                    ? partitionMapping.getSourceDataType()
+                    : partitionMapping.getTargetDataType());
+            
+            if (attemptChunking && !validChunkColumn) {
+                addLog(progress, "warning",
+                    "Chunking disabled for " + tableMapping.getSourceTable() + " (partition column is missing or not numeric)",
+                    null);
+            }
+            
+            if (attemptChunking && validChunkColumn) {
+                migratedRows = migrateTableWithChunks(project, tableMapping, settings, progress, pauseFlag);
+            } else {
+                migratedRows = migrateTable(project, tableMapping, settings, progress, pauseFlag);
+            }
             
             tableMapping.setStatus("migrated");
             updateTableMappingStatus(project.getId(), tableMapping.getId(), "migrated");
@@ -348,6 +569,54 @@ public class MigrationService {
         }
     }
     
+    private long migrateTableWithChunks(Project project,
+                                        TableMapping tableMapping,
+                                        AppSettings settings,
+                                        MigrationProgress progress,
+                                        AtomicBoolean pauseFlag) throws Exception {
+        List<ChunkRange> chunkRanges = buildChunkRanges(project, tableMapping);
+        if (chunkRanges.isEmpty()) {
+            addLog(progress, "warning",
+                "Unable to determine partition bounds for " + tableMapping.getSourceTable() + ". Falling back to single-thread copy.",
+                null);
+            return migrateTable(project, tableMapping, settings, progress, pauseFlag);
+        }
+        
+        int requestedWorkers = tableMapping.getChunkWorkers() != null ? tableMapping.getChunkWorkers() : 1;
+        int workerCount = Math.max(1, Math.min(requestedWorkers, chunkRanges.size()));
+        addLog(progress, "info",
+            String.format("Chunking %s using %d worker(s) across %d range(s)",
+                tableMapping.getSourceTable(), workerCount, chunkRanges.size()),
+            null);
+        
+        ExecutorService chunkExecutor = Executors.newFixedThreadPool(workerCount);
+        List<Future<Long>> chunkFutures = new ArrayList<>();
+        for (ChunkRange chunkRange : chunkRanges) {
+            chunkFutures.add(chunkExecutor.submit(() -> {
+                waitForResume(progress, pauseFlag);
+                return migrateTableRange(project, tableMapping, settings, progress, pauseFlag, chunkRange);
+            }));
+        }
+        
+        long migratedRows = 0L;
+        try {
+            for (Future<Long> future : chunkFutures) {
+                migratedRows += future.get();
+            }
+        } catch (ExecutionException e) {
+            chunkFutures.forEach(f -> f.cancel(true));
+            throw (e.getCause() instanceof Exception) ? (Exception) e.getCause() : new RuntimeException(e.getCause());
+        } finally {
+            chunkExecutor.shutdown();
+            try {
+                chunkExecutor.awaitTermination(30, TimeUnit.SECONDS);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+            }
+        }
+        return migratedRows;
+    }
+    
     private void createTargetTables(Project project, MigrationProgress progress) throws SQLException {
         try (Connection targetConn = connectionManager.getConnection(project.getTargetConnection())) {
             // Disable auto-commit for table creation to ensure atomicity
@@ -363,37 +632,21 @@ public class MigrationService {
                     String createTableSql = generateCreateTableSql(tableMapping);
                     
                     try (Statement stmt = targetConn.createStatement()) {
-                        // Handle drop/truncate based on table mapping settings
-                        if (tableMapping.getDropBeforeInsert() != null && tableMapping.getDropBeforeInsert()) {
-                            String dropSql = String.format("DROP TABLE IF EXISTS %s.%s CASCADE",
-                                quoteIdentifier(tableMapping.getTargetSchema()), 
-                                quoteIdentifier(tableMapping.getTargetTable()));
-                            stmt.execute(dropSql);
-                            addLog(progress, "info", "Dropped table: " + tableMapping.getTargetTable(), null);
+                        String checkTableSql = String.format(
+                            "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s')",
+                            tableMapping.getTargetSchema(), tableMapping.getTargetTable());
+                        boolean tableExists = false;
+                        try (var rs = stmt.executeQuery(checkTableSql)) {
+                            if (rs.next()) {
+                                tableExists = rs.getBoolean(1);
+                            }
                         }
                         
-                        // Create table (only if it doesn't exist or was dropped)
-                        if (tableMapping.getDropBeforeInsert() == null || !tableMapping.getDropBeforeInsert()) {
-                            // Check if table exists
-                            String checkTableSql = String.format(
-                                "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_schema = '%s' AND table_name = '%s')",
-                                tableMapping.getTargetSchema(), tableMapping.getTargetTable());
-                            boolean tableExists = false;
-                            try (var rs = stmt.executeQuery(checkTableSql)) {
-                                if (rs.next()) {
-                                    tableExists = rs.getBoolean(1);
-                                }
-                            }
-                            
-                            if (!tableExists) {
-                                stmt.execute(createTableSql);
-                                addLog(progress, "info", "Created table: " + tableMapping.getTargetTable(), null);
-                            } else {
-                                addLog(progress, "info", "Table already exists: " + tableMapping.getTargetTable(), null);
-                            }
-                        } else {
+                        if (!tableExists) {
                             stmt.execute(createTableSql);
                             addLog(progress, "info", "Created table: " + tableMapping.getTargetTable(), null);
+                        } else {
+                            addLog(progress, "info", "Table already exists: " + tableMapping.getTargetTable(), null);
                         }
                     }
                 }
@@ -468,6 +721,11 @@ public class MigrationService {
     
     private long migrateTable(Project project, TableMapping tableMapping, 
                              AppSettings settings, MigrationProgress progress, AtomicBoolean pauseFlag) throws SQLException {
+        return migrateTableRange(project, tableMapping, settings, progress, pauseFlag, null);
+    }
+    
+    private long migrateTableRange(Project project, TableMapping tableMapping, 
+                             AppSettings settings, MigrationProgress progress, AtomicBoolean pauseFlag, ChunkRange chunkRange) throws SQLException {
         try (Connection sourceConn = connectionManager.getConnection(project.getSourceConnection());
              Connection targetConn = connectionManager.getConnection(project.getTargetConnection())) {
             
@@ -483,22 +741,18 @@ public class MigrationService {
                 selectCols.append(col.getSourceColumn());
             }
             
-            // Build SELECT query with optional filter condition
             String selectSql = String.format("SELECT %s FROM %s.%s",
                 selectCols.toString(),
                 quoteIdentifier(tableMapping.getSourceSchema()),
                 quoteIdentifier(tableMapping.getSourceTable()));
             
-            // Add filter condition if specified
-            if (tableMapping.getFilterCondition() != null && !tableMapping.getFilterCondition().trim().isEmpty()) {
-                String filter = tableMapping.getFilterCondition().trim();
-                // Ensure it starts with WHERE if not already present
-                if (!filter.toUpperCase().startsWith("WHERE")) {
-                    selectSql += " WHERE " + filter;
-                } else {
-                    selectSql += " " + filter;
-                }
+            String extraCondition = null;
+            if (chunkRange != null && tableMapping.getPartitionColumn() != null) {
+                String columnIdentifier = quoteIdentifier(tableMapping.getPartitionColumn());
+                extraCondition = String.format("%s >= %d AND %s <= %d",
+                    columnIdentifier, chunkRange.startInclusive, columnIdentifier, chunkRange.endInclusive);
             }
+            selectSql += buildWhereClause(tableMapping.getFilterCondition(), extraCondition);
             
             // Build INSERT query
             StringBuilder insertCols = new StringBuilder();
@@ -510,17 +764,6 @@ public class MigrationService {
                 }
                 insertCols.append(col.getTargetColumn());
                 insertVals.append("?");
-            }
-            
-            // Handle truncate before insert if specified
-            if (tableMapping.getTruncateBeforeInsert() != null && tableMapping.getTruncateBeforeInsert()) {
-                try (Statement truncateStmt = targetConn.createStatement()) {
-                    String truncateSql = String.format("TRUNCATE TABLE %s.%s",
-                        quoteIdentifier(tableMapping.getTargetSchema()),
-                        quoteIdentifier(tableMapping.getTargetTable()));
-                    truncateStmt.execute(truncateSql);
-                    addLog(progress, "info", "Truncated table: " + tableMapping.getTargetTable(), null);
-                }
             }
             
             String insertSql = String.format("INSERT INTO %s.%s (%s) VALUES (%s)",
