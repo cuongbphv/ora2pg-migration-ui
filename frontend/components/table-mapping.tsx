@@ -8,6 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from "@/components/ui/pagination"
+import {
   TableIcon,
   SearchIcon,
   FilterIcon,
@@ -29,9 +38,10 @@ import { toast } from "@/lib/toast"
 
 interface TableMappingProps {
   projectId?: string | null
+  appSettings?: { tableNameFilter?: string }
 }
 
-export function TableMappingView({ projectId }: TableMappingProps) {
+export function TableMappingView({ projectId, appSettings }: TableMappingProps) {
   const [project, setProject] = useState<Project | null>(null)
   const [tables, setTables] = useState<TableMapping[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -42,6 +52,8 @@ export function TableMappingView({ projectId }: TableMappingProps) {
   const [loading, setLoading] = useState(false)
   const [discovering, setDiscovering] = useState(false)
   const [autoMapping, setAutoMapping] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(50)
 
   // Load project and table mappings
   useEffect(() => {
@@ -97,7 +109,8 @@ export function TableMappingView({ projectId }: TableMappingProps) {
       setDiscovering(true)
       const result = await apiService.discoverTables(
         project.sourceConnection,
-        project.sourceConnection.schema || ""
+        project.sourceConnection.schema || "",
+        appSettings?.tableNameFilter
       )
       if (result.data) {
         // Convert TableInfo to TableMapping format
@@ -392,11 +405,54 @@ export function TableMappingView({ projectId }: TableMappingProps) {
   // Get available PostgreSQL types
   const postgresTypes = [...new Set(oracleToPostgresTypes.map((m) => m.postgresType))]
 
-  const filteredTables = tables.filter(
-    (table) =>
-      table.sourceTable.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      table.targetTable.toLowerCase().includes(searchTerm.toLowerCase()),
-  )
+  // Enhanced search - search by table name, schema, or column name
+  const filteredTables = tables.filter((table) => {
+    if (!searchTerm) return true
+    
+    const searchLower = searchTerm.toLowerCase()
+    
+    // Search in source table name and schema
+    if (
+      table.sourceTable.toLowerCase().includes(searchLower) ||
+      table.sourceSchema.toLowerCase().includes(searchLower) ||
+      `${table.sourceSchema}.${table.sourceTable}`.toLowerCase().includes(searchLower)
+    ) {
+      return true
+    }
+    
+    // Search in target table name and schema
+    if (
+      table.targetTable.toLowerCase().includes(searchLower) ||
+      table.targetSchema.toLowerCase().includes(searchLower) ||
+      `${table.targetSchema}.${table.targetTable}`.toLowerCase().includes(searchLower)
+    ) {
+      return true
+    }
+    
+    // Search in column names
+    if (
+      table.columnMappings.some(
+        (col) =>
+          col.sourceColumn.toLowerCase().includes(searchLower) ||
+          col.targetColumn.toLowerCase().includes(searchLower)
+      )
+    ) {
+      return true
+    }
+    
+    return false
+  })
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredTables.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedTables = filteredTables.slice(startIndex, endIndex)
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
 
   if (!projectId) {
     return (
@@ -461,27 +517,57 @@ export function TableMappingView({ projectId }: TableMappingProps) {
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Search tables..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10 bg-input border-border"
-        />
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1">
+          <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by table name, schema, or column name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10 bg-input border-border"
+          />
+        </div>
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span>Items per page:</span>
+          <Select
+            value={itemsPerPage.toString()}
+            onValueChange={(value) => {
+              setItemsPerPage(Number(value))
+              setCurrentPage(1)
+            }}
+          >
+            <SelectTrigger className="w-20 h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+              <SelectItem value="100">100</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Summary */}
-      <div className="flex items-center gap-4 text-sm">
-        <span className="text-muted-foreground">
-          {selectedTables.length} of {tables.length} tables selected
-        </span>
-        <span className="text-muted-foreground">•</span>
-        <span className="text-success">{tables.filter((t) => t.status === "migrated").length} migrated</span>
-        <span className="text-muted-foreground">•</span>
-        <span className="text-primary">{tables.filter((t) => t.status === "mapped").length} mapped</span>
-        <span className="text-muted-foreground">•</span>
-        <span className="text-warning">{tables.filter((t) => t.status === "pending").length} pending</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4 text-sm">
+          <span className="text-muted-foreground">
+            {selectedTables.length} of {tables.length} tables selected
+          </span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-success">{tables.filter((t) => t.status === "migrated").length} migrated</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-primary">{tables.filter((t) => t.status === "mapped").length} mapped</span>
+          <span className="text-muted-foreground">•</span>
+          <span className="text-warning">{tables.filter((t) => t.status === "pending").length} pending</span>
+        </div>
+        {filteredTables.length > 0 && (
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredTables.length)} of {filteredTables.length} tables
+            {searchTerm && ` (filtered from ${tables.length} total)`}
+          </div>
+        )}
       </div>
 
       {/* Table List */}
@@ -538,7 +624,14 @@ export function TableMappingView({ projectId }: TableMappingProps) {
               </div>
 
               {/* Tables */}
-              {filteredTables.map((table) => (
+              {paginatedTables.length === 0 ? (
+                <div className="px-4 py-12 text-center">
+                  <p className="text-muted-foreground">
+                    {searchTerm ? "No tables found matching your search" : "No tables to display"}
+                  </p>
+                </div>
+              ) : (
+                paginatedTables.map((table) => (
                 <div key={table.id} className="border-b border-border last:border-b-0">
                   {/* Table Row */}
                   <div
@@ -874,10 +967,81 @@ export function TableMappingView({ projectId }: TableMappingProps) {
                     </div>
                   )}
                 </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Pagination */}
+      {filteredTables.length > itemsPerPage && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Page {currentPage} of {totalPages}
+          </div>
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setCurrentPage((prev) => Math.max(1, prev - 1))
+                  }}
+                  className={currentPage === 1 ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  href="#"
+                />
+              </PaginationItem>
+              
+              {/* Page numbers */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number
+                if (totalPages <= 5) {
+                  pageNum = i + 1
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i
+                } else {
+                  pageNum = currentPage - 2 + i
+                }
+                
+                return (
+                  <PaginationItem key={pageNum}>
+                    <PaginationLink
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setCurrentPage(pageNum)
+                      }}
+                      isActive={currentPage === pageNum}
+                      className="cursor-pointer"
+                      href="#"
+                    >
+                      {pageNum}
+                    </PaginationLink>
+                  </PaginationItem>
+                )
+              })}
+              
+              {totalPages > 5 && currentPage < totalPages - 2 && (
+                <PaginationItem>
+                  <PaginationEllipsis />
+                </PaginationItem>
+              )}
+              
+              <PaginationItem>
+                <PaginationNext
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                  }}
+                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : "cursor-pointer"}
+                  href="#"
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
       )}
     </div>
   )

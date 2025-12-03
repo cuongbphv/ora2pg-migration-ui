@@ -36,5 +36,8 @@ public class AppSettings {
     private Boolean skipErrors;
     private Integer maxErrors;
     private Boolean autoCommit; // Control auto-commit mode for target database
+    
+    // Table Discovery
+    private String tableNameFilter; // SQL LIKE pattern for filtering tables (e.g., "TRADE_%")
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import type { MigrationProgress, MigrationLog } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -19,33 +19,58 @@ export function MigrationPanel({ projectId }: MigrationPanelProps) {
   const [isRunning, setIsRunning] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // Load migration progress
-  useEffect(() => {
-    if (projectId) {
-      loadProgress()
-      // Poll for progress updates every 2 seconds if migration is running
-      const interval = setInterval(() => {
-        if (isRunning && projectId) {
-          loadProgress()
-        }
-      }, 2000)
-
-      return () => clearInterval(interval)
-    }
-  }, [projectId, isRunning])
-
-  const loadProgress = async () => {
+  const loadProgress = useCallback(async () => {
     if (!projectId) return
     try {
       const result = await apiService.getMigrationProgress(projectId)
       if (result.data) {
-        setProgress(result.data)
-        setIsRunning(result.data.status === "running")
+        const migrationData = result.data as MigrationProgress
+        setProgress(migrationData)
+        setIsRunning(migrationData.status === "running")
+      } else {
+        // If no data returned, migration might not have started yet
+        // Set default progress state
+        setProgress(null)
+        setIsRunning(false)
       }
     } catch (error) {
       console.error("Failed to load migration progress:", error)
+      // On error, don't clear existing progress - might be a temporary network issue
     }
-  }
+  }, [projectId])
+
+  // Load migration progress on mount and when projectId changes
+  useEffect(() => {
+    if (projectId) {
+      loadProgress()
+    } else {
+      // Reset state when no project is selected
+      setProgress(null)
+      setIsRunning(false)
+    }
+  }, [projectId, loadProgress])
+
+  // Separate polling effect - only poll when migration is running
+  useEffect(() => {
+    if (!projectId || !isRunning) return
+
+    const interval = setInterval(() => {
+      loadProgress()
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [projectId, isRunning, loadProgress])
+
+  // Also poll when status is paused to show updates
+  useEffect(() => {
+    if (!projectId || progress?.status !== "paused") return
+
+    const interval = setInterval(() => {
+      loadProgress()
+    }, 5000) // Poll less frequently for paused migrations
+
+    return () => clearInterval(interval)
+  }, [projectId, progress?.status, loadProgress])
 
   const handleStartMigration = async () => {
     if (!projectId) {

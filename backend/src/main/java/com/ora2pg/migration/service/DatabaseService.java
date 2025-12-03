@@ -2,6 +2,7 @@ package com.ora2pg.migration.service;
 
 import com.ora2pg.migration.model.*;
 import com.ora2pg.migration.util.DatabaseConnectionManager;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 public class DatabaseService {
     
@@ -34,38 +36,56 @@ public class DatabaseService {
         }
     }
     
-    public List<TableInfo> discoverTables(ConnectionConfig config, String schema) throws SQLException {
+    public List<TableInfo> discoverTables(ConnectionConfig config, String schema, String tableNameFilter) throws SQLException {
         List<TableInfo> tables = new ArrayList<>();
         
         try (Connection conn = connectionManager.getConnection(config)) {
             if ("oracle".equalsIgnoreCase(config.getType())) {
-                tables = discoverOracleTables(conn, schema);
+                tables = discoverOracleTables(conn, schema, tableNameFilter);
             } else if ("postgresql".equalsIgnoreCase(config.getType())) {
-                tables = discoverPostgresTables(conn, schema);
+                tables = discoverPostgresTables(conn, schema, tableNameFilter);
             }
         }
         
         return tables;
     }
     
-    private List<TableInfo> discoverOracleTables(Connection conn, String schema) throws SQLException {
+    private List<TableInfo> discoverOracleTables(Connection conn, String schema, String tableNameFilter) throws SQLException {
         List<TableInfo> tables = new ArrayList<>();
-        String sql = """
-            SELECT table_name 
-            FROM all_tables 
-            WHERE owner = UPPER(?)
-            ORDER BY table_name
-            """;
+        
+        // Build SQL with optional table name filter
+        String sql;
+        if (tableNameFilter != null && !tableNameFilter.trim().isEmpty()) {
+            sql = """
+                SELECT table_name 
+                FROM all_tables 
+                WHERE owner = UPPER(?) AND table_name LIKE UPPER(?)
+                ORDER BY table_name
+                """;
+        } else {
+            sql = """
+                SELECT table_name 
+                FROM all_tables 
+                WHERE owner = UPPER(?)
+                ORDER BY table_name
+                """;
+        }
         
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, schema);
+            if (tableNameFilter != null && !tableNameFilter.trim().isEmpty()) {
+                stmt.setString(2, tableNameFilter.toUpperCase());
+            }
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     String tableName = rs.getString("table_name");
                     TableInfo table = new TableInfo(tableName, schema);
-                    table.setRowCount(getRowCount(conn, schema, tableName));
-                    table.setColumns(discoverOracleColumns(conn, schema, tableName));
+                    Long rowCount = getRowCount(conn, schema, tableName);
+                    table.setRowCount(rowCount);
+                    List<ColumnInfo> columns = discoverOracleColumns(conn, schema, tableName);
+                    table.setColumns(columns);
                     tables.add(table);
+                    log.info("Scanned table {} with total rows {} and total columns {}", tableName, rowCount, columns.size());
                 }
             }
         }
@@ -73,18 +93,35 @@ public class DatabaseService {
         return tables;
     }
     
-    private List<TableInfo> discoverPostgresTables(Connection conn, String schema) throws SQLException {
+    private List<TableInfo> discoverPostgresTables(Connection conn, String schema, String tableNameFilter) throws SQLException {
         List<TableInfo> tables = new ArrayList<>();
-        String sql = """
-            SELECT table_name 
-            FROM information_schema.tables 
-            WHERE table_schema = ?
-            AND table_type = 'BASE TABLE'
-            ORDER BY table_name
-            """;
+        
+        // Build SQL with optional table name filter
+        String sql;
+        if (tableNameFilter != null && !tableNameFilter.trim().isEmpty()) {
+            sql = """
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = ?
+                AND table_type = 'BASE TABLE'
+                AND table_name LIKE ?
+                ORDER BY table_name
+                """;
+        } else {
+            sql = """
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = ?
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+                """;
+        }
         
         try (PreparedStatement stmt = conn.prepareStatement(sql)) {
             stmt.setString(1, schema);
+            if (tableNameFilter != null && !tableNameFilter.trim().isEmpty()) {
+                stmt.setString(2, tableNameFilter);
+            }
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
                     String tableName = rs.getString("table_name");

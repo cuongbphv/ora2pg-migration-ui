@@ -170,7 +170,7 @@ oracle-to-postgres-migration/
 ┌─────────────────┐
 │   Backend API   │
 │  (Spring Boot)  │
-│   Port: 8080    │
+│   Port: 8090    │
 └────────┬────────┘
          │
          ├──────────────┐
@@ -302,7 +302,7 @@ oracle-to-postgres-migration/
 - **Docker**: 20.10 or higher
 - **Docker Compose**: 2.0 or higher
 - **RAM**: At least 4GB available
-- **Ports**: 3000, 8080, 5432 available
+- **Ports**: 3000, 8090, 5432 available
 
 ## 🚀 Installation
 
@@ -333,7 +333,7 @@ This is the easiest way to get started:
 
 5. **Access the application**:
    - Frontend: http://localhost:3000
-   - Backend API: http://localhost:8080/api
+   - Backend API: http://localhost:8090/api
    - PostgreSQL: localhost:5432
 
 ### Option 2: Manual Installation
@@ -370,7 +370,7 @@ This is the easiest way to get started:
    mvn spring-boot:run
    ```
 
-   The API will be available at `http://localhost:8080/api`
+   The API will be available at `http://localhost:8090/api`
 
 #### Frontend Setup
 
@@ -386,10 +386,10 @@ This is the easiest way to get started:
    pnpm install
    ```
 
-3. **Configure API URL** (if backend is not on localhost:8080):
+3. **Configure API URL** (if backend is not on localhost:8090):
    - Create `.env.local`:
      ```env
-     NEXT_PUBLIC_API_URL=http://localhost:8080/api
+     NEXT_PUBLIC_API_URL=http://localhost:8090/api
      ```
 
 4. **Run the development server**:
@@ -418,7 +418,7 @@ Edit `backend/src/main/resources/application.properties`:
 
 ```properties
 # Server Configuration
-server.port=8080
+server.port=8090
 server.servlet.context-path=/api
 
 # PostgreSQL Database Configuration
@@ -453,7 +453,7 @@ migration.default.commit-interval=10000
 Create `frontend/.env.local`:
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8080/api
+NEXT_PUBLIC_API_URL=http://localhost:8090/api
 ```
 
 ### Docker Configuration
@@ -935,12 +935,12 @@ The application automatically maps Oracle data types to PostgreSQL:
    ```bash
    # Windows
    netstat -ano | findstr :3000
-   netstat -ano | findstr :8080
+   netstat -ano | findstr :8090
    netstat -ano | findstr :5432
    
    # Linux/Mac
    lsof -i :3000
-   lsof -i :8080
+   lsof -i :8090
    lsof -i :5432
    ```
 
@@ -969,7 +969,7 @@ The application automatically maps Oracle data types to PostgreSQL:
 
 1. **Verify backend is running**:
    ```bash
-   curl http://localhost:8080/api/auth/login
+   curl http://localhost:8090/api/auth/login
    ```
 
 2. **Check CORS configuration** in `application.properties`

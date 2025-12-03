@@ -1,0 +1,8 @@
+node_modules/
+.next/
+.git/
+.idea/
+*.log
+.DS_Store
+.next/
+target/

@@ -4,6 +4,7 @@ import com.ora2pg.migration.model.ConnectionConfig;
 import com.ora2pg.migration.model.TableInfo;
 import com.ora2pg.migration.model.TableMapping;
 import com.ora2pg.migration.service.DatabaseService;
+import com.ora2pg.migration.service.SettingsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -20,14 +21,23 @@ public class DatabaseController {
     @Autowired
     private DatabaseService databaseService;
     
+    @Autowired
+    private SettingsService settingsService;
+    
     @PostMapping("/discover-tables")
     public ResponseEntity<List<TableInfo>> discoverTables(
             @RequestBody Map<String, Object> request) {
         try {
             ConnectionConfig config = convertToConnectionConfig((Map<String, Object>) request.get("connection"));
             String schema = (String) request.get("schema");
+            String tableNameFilter = (String) request.get("tableNameFilter");
             
-            List<TableInfo> tables = databaseService.discoverTables(config, schema);
+            // If no filter provided in request, get from settings
+            if (tableNameFilter == null || tableNameFilter.trim().isEmpty()) {
+                tableNameFilter = settingsService.getSettings().getTableNameFilter();
+            }
+            
+            List<TableInfo> tables = databaseService.discoverTables(config, schema, tableNameFilter);
             return ResponseEntity.ok(tables);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();

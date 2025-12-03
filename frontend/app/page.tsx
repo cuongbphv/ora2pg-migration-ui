@@ -23,6 +23,7 @@ function MainContent() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings)
   const [loading, setLoading] = useState(true)
+  const [migrationKey, setMigrationKey] = useState(0)
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || null
 
@@ -42,6 +43,14 @@ function MainContent() {
     if (activeTab === "dashboard" && selectedProjectId && user && !authLoading) {
       // Reload projects to get updated table statuses
       loadProjects()
+    }
+  }, [activeTab])
+
+  // Force remount of migration panel when switching to migration tab to ensure fresh data
+  useEffect(() => {
+    if (activeTab === "migration") {
+      // Force remount by changing key to ensure fresh data load
+      setMigrationKey((prev) => prev + 1)
     }
   }, [activeTab])
 
@@ -136,11 +145,11 @@ function MainContent() {
           />
         )
       case "tables":
-        return <TableMappingView projectId={selectedProjectId} />
+        return <TableMappingView projectId={selectedProjectId} appSettings={appSettings} />
       case "datatypes":
         return <DataTypeRules />
       case "migration":
-        return <MigrationPanel projectId={selectedProjectId} />
+        return <MigrationPanel key={migrationKey} projectId={selectedProjectId} />
       default:
         return <Dashboard project={selectedProject} />
     }

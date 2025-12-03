@@ -120,4 +120,7 @@ export interface AppSettings {
   skipErrors: boolean
   maxErrors: number
   autoCommit: boolean
+  
+  // Table Discovery
+  tableNameFilter?: string // SQL LIKE pattern for filtering tables (e.g., "TBL_%")
 }

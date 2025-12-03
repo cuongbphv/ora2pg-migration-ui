@@ -5,7 +5,7 @@
  * To use this service, update the components to call these methods instead of using mock data.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8090/api';
 
 export interface ApiResponse<T> {
   data?: T;
@@ -125,10 +125,10 @@ class ApiService {
   }
 
   // Database
-  async discoverTables(connection: any, schema: string) {
+  async discoverTables(connection: any, schema: string, tableNameFilter?: string) {
     return this.request('/database/discover-tables', {
       method: 'POST',
-      body: JSON.stringify({ connection, schema }),
+      body: JSON.stringify({ connection, schema, tableNameFilter }),
     });
   }
 

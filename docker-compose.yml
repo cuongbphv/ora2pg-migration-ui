@@ -32,7 +32,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: postgres
       JWT_SECRET: your-256-bit-secret-key-for-jwt-token-generation-minimum-32-characters-long
     ports:
-      - "8080:8080"
+      - "8090:8090"
     depends_on:
       postgres:
         condition: service_healthy
@@ -46,7 +46,7 @@ services:
       dockerfile: Dockerfile
     container_name: migration-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8080/api
+      NEXT_PUBLIC_API_URL: http://localhost:8090/api
     ports:
       - "3000:3000"
     depends_on:

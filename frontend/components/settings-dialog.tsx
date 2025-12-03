@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CpuIcon, MailIcon, FileTextIcon, ZapIcon, SaveIcon } from "./icons"
+import { CpuIcon, MailIcon, FileTextIcon, ZapIcon, SaveIcon, SearchIcon } from "./icons"
 import type { AppSettings } from "@/lib/types"
 
 interface SettingsDialogProps {
@@ -40,6 +40,7 @@ const defaultSettings: AppSettings = {
   skipErrors: false,
   maxErrors: 100,
   autoCommit: false,
+  tableNameFilter: "",
 }
 
 export function SettingsDialog({
@@ -71,7 +72,7 @@ export function SettingsDialog({
         </DialogHeader>
 
         <Tabs defaultValue="performance" className="mt-4">
-          <TabsList className="grid w-full grid-cols-4 bg-muted/30">
+          <TabsList className="grid w-full grid-cols-5 bg-muted/30">
             <TabsTrigger value="performance" className="text-xs">
               <CpuIcon className="w-3 h-3 mr-1" />
               Performance
@@ -83,6 +84,10 @@ export function SettingsDialog({
             <TabsTrigger value="logging" className="text-xs">
               <FileTextIcon className="w-3 h-3 mr-1" />
               Logging
+            </TabsTrigger>
+            <TabsTrigger value="discovery" className="text-xs">
+              <SearchIcon className="w-3 h-3 mr-1" />
+              Discovery
             </TabsTrigger>
             <TabsTrigger value="migration" className="text-xs">
               <ZapIcon className="w-3 h-3 mr-1" />
@@ -287,6 +292,22 @@ export function SettingsDialog({
                 />
               </div>
             )}
+          </TabsContent>
+
+          {/* Discovery Tab */}
+          <TabsContent value="discovery" className="space-y-4 mt-4">
+            <div className="space-y-1">
+              <Label>Table Name Filter</Label>
+              <Input
+                value={localSettings.tableNameFilter || ""}
+                onChange={(e) => updateSetting("tableNameFilter", e.target.value)}
+                placeholder="e.g., TRADE_%"
+                className="font-mono"
+              />
+              <p className="text-xs text-muted-foreground">
+                SQL LIKE pattern for filtering tables during discovery. Use % as wildcard. Example: TRADE_% to discover only tables starting with TRADE_
+              </p>
+            </div>
           </TabsContent>
 
           {/* Migration Tab */}

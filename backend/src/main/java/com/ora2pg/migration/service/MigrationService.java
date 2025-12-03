@@ -1,11 +1,14 @@
 package com.ora2pg.migration.service;
 
 import com.ora2pg.migration.entity.MigrationLogEntity;
+import com.ora2pg.migration.entity.MigrationProgressEntity;
 import com.ora2pg.migration.entity.ProjectEntity;
 import com.ora2pg.migration.model.*;
 import com.ora2pg.migration.repository.MigrationLogRepository;
+import com.ora2pg.migration.repository.MigrationProgressRepository;
 import com.ora2pg.migration.repository.ProjectRepository;
 import com.ora2pg.migration.util.DatabaseConnectionManager;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class MigrationService {
     
@@ -32,8 +36,12 @@ public class MigrationService {
     @Autowired
     private com.ora2pg.migration.repository.TableMappingRepository tableMappingRepository;
     
+    @Autowired
+    private MigrationProgressRepository migrationProgressRepository;
+    
     private final ConcurrentHashMap<String, MigrationProgress> progressMap = new ConcurrentHashMap<>();
     
+    @Transactional
     public MigrationProgress startMigration(Project project, AppSettings settings) {
         MigrationProgress progress = new MigrationProgress(project.getId());
         progress.setStatus("running");
@@ -42,6 +50,9 @@ public class MigrationService {
         progress.setCompletedTables(0);
         progress.setTotalRows(0L);
         progress.setMigratedRows(0L);
+        
+        // Save to database
+        saveProgressToDatabase(project.getId(), progress);
         
         progressMap.put(project.getId(), progress);
         
@@ -75,6 +86,7 @@ public class MigrationService {
                     updateTableMappingStatus(project.getId(), tableMapping.getId(), "migrated");
                     
                     progress.setCompletedTables(progress.getCompletedTables() + 1);
+                    saveProgressToDatabase(progress.getProjectId(), progress);
                     addLog(progress, "success", "Completed table: " + tableMapping.getSourceTable(), null);
                 } catch (Exception e) {
                     // Update table status to "error" if migration fails
@@ -87,10 +99,12 @@ public class MigrationService {
             
             progress.setStatus("completed");
             progress.setCurrentTable(null);
+            saveProgressToDatabase(progress.getProjectId(), progress);
             addLog(progress, "success", "Migration completed successfully", null);
             
         } catch (Exception e) {
             progress.setStatus("error");
+            saveProgressToDatabase(progress.getProjectId(), progress);
             addLog(progress, "error", "Migration failed: " + e.getMessage(), e.toString());
         }
     }
@@ -434,8 +448,8 @@ public class MigrationService {
                     }
                     
                     if (totalRows % commitInterval == 0) {
-                        addLog(progress, "info", 
-                            String.format("Migrated %d rows from %s", totalRows, tableMapping.getSourceTable()), null);
+                        addLog(progress, "info", String.format("Migrated %d rows from %s", totalRows, tableMapping.getSourceTable()), null);
+                        log.info("Migrated {} rows from {}", totalRows, tableMapping.getSourceTable());
                     }
                 }
                 
@@ -446,6 +460,10 @@ public class MigrationService {
                         targetConn.commit();
                     }
                     progress.setMigratedRows(progress.getMigratedRows() + rowCount);
+                    // Periodically save progress to database
+                    if (progress.getMigratedRows() % 10000 == 0) {
+                        saveProgressToDatabase(progress.getProjectId(), progress);
+                    }
                 }
             } finally {
                 // Restore original auto-commit setting (before connections close)
@@ -483,21 +501,121 @@ public class MigrationService {
     }
     
     public MigrationProgress getProgress(String projectId) {
+        // First check in-memory cache
         MigrationProgress progress = progressMap.get(projectId);
+        
         if (progress == null) {
-            progress = new MigrationProgress(projectId);
-            // Load logs from database if available
+            // Try to load from database
             try {
                 ProjectEntity project = projectRepository.findById(projectId).orElse(null);
                 if (project != null) {
+                    MigrationProgressEntity entity = migrationProgressRepository
+                        .findByProject(project)
+                        .orElse(null);
+                    
+                    if (entity != null) {
+                        // Load from database
+                        progress = entityToModel(entity);
+                    } else {
+                        // No progress in DB, calculate from table mappings
+                        progress = calculateProgressFromTableMappings(project);
+                    }
+                    
+                    // Load logs from database
                     List<MigrationLogEntity> logEntities = migrationLogRepository
                         .findByProjectOrderByTimestampDesc(project);
                     progress.setLogs(logEntities.stream().map(this::toMigrationLog).collect(Collectors.toList()));
+                } else {
+                    progress = new MigrationProgress(projectId);
                 }
             } catch (Exception e) {
-                // Ignore errors loading logs
+                log.error("Failed to load migration progress from database", e);
+                progress = new MigrationProgress(projectId);
             }
         }
+        
+        return progress;
+    }
+    
+    private MigrationProgress calculateProgressFromTableMappings(ProjectEntity projectEntity) {
+        MigrationProgress progress = new MigrationProgress(projectEntity.getId());
+        
+        // Calculate from table mappings
+        List<com.ora2pg.migration.entity.TableMappingEntity> tableMappings = 
+            projectEntity.getTableMappings();
+        
+        int totalTables = tableMappings.size();
+        int completedTables = 0;
+        long totalRows = 0L;
+        long migratedRows = 0L;
+        
+        for (com.ora2pg.migration.entity.TableMappingEntity mapping : tableMappings) {
+            if ("migrated".equals(mapping.getStatus())) {
+                completedTables++;
+            }
+            // Note: We don't have row counts in table mappings, so we can't calculate exact migrated rows
+            // This would require additional queries or storing row counts
+        }
+        
+        progress.setTotalTables(totalTables);
+        progress.setCompletedTables(completedTables);
+        progress.setTotalRows(totalRows);
+        progress.setMigratedRows(migratedRows);
+        
+        // Determine status based on table mappings
+        if (completedTables == 0) {
+            progress.setStatus("idle");
+        } else if (completedTables == totalTables) {
+            progress.setStatus("completed");
+        } else {
+            progress.setStatus("paused"); // Assume paused if partially completed
+        }
+        
+        return progress;
+    }
+    
+    @Transactional
+    private void saveProgressToDatabase(String projectId, MigrationProgress progress) {
+        try {
+            ProjectEntity project = projectRepository.findById(projectId).orElse(null);
+            if (project == null) {
+                return;
+            }
+            
+            MigrationProgressEntity entity = migrationProgressRepository
+                .findByProject(project)
+                .orElse(new MigrationProgressEntity());
+            
+            if (entity.getId() == null) {
+                entity.setProject(project);
+            }
+            
+            entity.setStatus(progress.getStatus());
+            entity.setTotalTables(progress.getTotalTables());
+            entity.setCompletedTables(progress.getCompletedTables());
+            entity.setTotalRows(progress.getTotalRows());
+            entity.setMigratedRows(progress.getMigratedRows());
+            entity.setCurrentTable(progress.getCurrentTable());
+            entity.setStartTime(progress.getStartTime());
+            entity.setEstimatedEndTime(progress.getEstimatedEndTime());
+            
+            migrationProgressRepository.save(entity);
+        } catch (Exception e) {
+            log.error("Failed to save migration progress to database", e);
+            // Don't throw - migration should continue even if saving fails
+        }
+    }
+    
+    private MigrationProgress entityToModel(MigrationProgressEntity entity) {
+        MigrationProgress progress = new MigrationProgress(entity.getProject().getId());
+        progress.setStatus(entity.getStatus());
+        progress.setTotalTables(entity.getTotalTables());
+        progress.setCompletedTables(entity.getCompletedTables());
+        progress.setTotalRows(entity.getTotalRows());
+        progress.setMigratedRows(entity.getMigratedRows());
+        progress.setCurrentTable(entity.getCurrentTable());
+        progress.setStartTime(entity.getStartTime());
+        progress.setEstimatedEndTime(entity.getEstimatedEndTime());
         return progress;
     }
     
@@ -513,16 +631,26 @@ public class MigrationService {
     
     public void pauseMigration(String projectId) {
         MigrationProgress progress = progressMap.get(projectId);
+        if (progress == null) {
+            progress = getProgress(projectId);
+            progressMap.put(projectId, progress);
+        }
         if (progress != null && "running".equals(progress.getStatus())) {
             progress.setStatus("paused");
+            saveProgressToDatabase(projectId, progress);
             addLog(progress, "info", "Migration paused", null);
         }
     }
     
     public void resumeMigration(String projectId) {
         MigrationProgress progress = progressMap.get(projectId);
+        if (progress == null) {
+            progress = getProgress(projectId);
+            progressMap.put(projectId, progress);
+        }
         if (progress != null && "paused".equals(progress.getStatus())) {
             progress.setStatus("running");
+            saveProgressToDatabase(projectId, progress);
             addLog(progress, "info", "Migration resumed", null);
         }
     }
