@@ -43,6 +43,9 @@ public class MigrationProgressEntity {
     private LocalDateTime startTime;
     
     @Column
+    private LocalDateTime endTime;
+    
+    @Column
     private LocalDateTime estimatedEndTime;
     
     @Column(nullable = false, updatable = false)

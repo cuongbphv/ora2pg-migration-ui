@@ -31,7 +31,7 @@ import {
   XIcon,
   RefreshIcon,
   CheckIcon,
-} from "./icons"
+} from "../icons"
 import { cn } from "@/lib/utils"
 import { oracleToPostgresTypes } from "@/lib/data-type-mappings"
 import { apiService } from "@/lib/api"

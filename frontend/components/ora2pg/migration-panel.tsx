@@ -5,7 +5,7 @@ import type { MigrationProgress, MigrationLog } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-import { PlayIcon, PauseIcon, CheckIcon, AlertIcon, ClockIcon, DownloadIcon } from "./icons"
+import { PlayIcon, PauseIcon, CheckIcon, AlertIcon, ClockIcon, DownloadIcon } from "../icons"
 import { cn } from "@/lib/utils"
 import { apiService } from "@/lib/api"
 import { toast } from "@/lib/toast"
@@ -128,10 +128,14 @@ export function MigrationPanel({ projectId }: MigrationPanelProps) {
     return d.toLocaleTimeString()
   }
 
-  const formatDuration = (start?: Date | string) => {
+  const formatDuration = (start?: Date | string, end?: Date | string, status?: string) => {
     if (!start) return "0:00:00"
     const startDate = typeof start === "string" ? new Date(start) : start
-    const diff = Date.now() - startDate.getTime()
+    // Use end time if migration is completed/error, otherwise use current time for running migrations
+    const endDate = end 
+      ? (typeof end === "string" ? new Date(end) : end)
+      : (status === "completed" || status === "error" ? startDate : new Date())
+    const diff = endDate.getTime() - startDate.getTime()
     const hours = Math.floor(diff / 3600000)
     const minutes = Math.floor((diff % 3600000) / 60000)
     const seconds = Math.floor((diff % 60000) / 1000)
@@ -235,7 +239,7 @@ export function MigrationPanel({ projectId }: MigrationPanelProps) {
           <CardContent className="p-4">
             <p className="text-sm text-muted-foreground">Duration</p>
             <p className="text-xl font-mono font-bold mt-1">
-              {formatDuration(progress.startTime)}
+              {formatDuration(progress.startTime, progress.endTime, progress.status)}
             </p>
           </CardContent>
         </Card>

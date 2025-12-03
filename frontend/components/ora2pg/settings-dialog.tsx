@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CpuIcon, MailIcon, FileTextIcon, ZapIcon, SaveIcon, SearchIcon } from "./icons"
+import { CpuIcon, MailIcon, FileTextIcon, ZapIcon, SaveIcon, SearchIcon } from "../icons"
 import type { AppSettings } from "@/lib/types"
 
 interface SettingsDialogProps {

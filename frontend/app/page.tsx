@@ -2,17 +2,19 @@
 
 import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/sidebar"
-import { Dashboard } from "@/components/dashboard"
-import { ConnectionForm } from "@/components/connection-form"
-import { TableMappingView } from "@/components/table-mapping"
-import { DataTypeRules } from "@/components/data-type-rules"
-import { MigrationPanel } from "@/components/migration-panel"
-import { NewProjectDialog } from "@/components/new-project-dialog"
-import { LoginPage } from "@/components/login-page"
-import { SettingsDialog, defaultSettings } from "@/components/settings-dialog"
+import { Dashboard } from "@/components/ora2pg/dashboard"
+import { ConnectionForm } from "@/components/ora2pg/connection-form"
+import { TableMappingView } from "@/components/ora2pg/table-mapping"
+import { DataTypeRules } from "@/components/ora2pg/data-type-rules"
+import { MigrationPanel } from "@/components/ora2pg/migration-panel"
+import { NewProjectDialog } from "@/components/ora2pg/new-project-dialog"
+import { LoginPage } from "@/components/auth/login-page"
+import { SettingsDialog, defaultSettings } from "@/components/ora2pg/settings-dialog"
 import { AuthProvider, useAuth } from "@/lib/auth-context"
 import { apiService } from "@/lib/api"
 import type { Project, ConnectionConfig, AppSettings } from "@/lib/types"
+import PGPipelineBuilder from "@/components/pg2pg/pg-pipeline-builder"
+import PGPipelineManager from "@/components/pg2pg/pg-pipeline-manager"
 
 function MainContent() {
   const { user, logout, isLoading: authLoading } = useAuth()
@@ -24,6 +26,7 @@ function MainContent() {
   const [appSettings, setAppSettings] = useState<AppSettings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [migrationKey, setMigrationKey] = useState(0)
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null)
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId) || null
 
@@ -150,6 +153,12 @@ function MainContent() {
         return <DataTypeRules />
       case "migration":
         return <MigrationPanel key={migrationKey} projectId={selectedProjectId} />
+      case "pg2pg":
+        return selectedPipelineId ? (
+          <PGPipelineBuilder pipelineId={selectedPipelineId} onBack={() => setSelectedPipelineId(null)} />
+        ) : (
+          <PGPipelineManager onSelectPipeline={setSelectedPipelineId} />
+        )
       default:
         return <Dashboard project={selectedProject} />
     }

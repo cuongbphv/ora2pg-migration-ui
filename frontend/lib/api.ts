@@ -174,6 +174,83 @@ class ApiService {
       body: JSON.stringify(settings),
     });
   }
+
+  // Pg2Pg Pipelines
+  async getPipelines() {
+    return this.request('/pg2pg/pipelines');
+  }
+
+  async getPipeline(id: string) {
+    return this.request(`/pg2pg/pipelines/${id}`);
+  }
+
+  async createPipeline(name: string, description?: string) {
+    return this.request('/pg2pg/pipelines', {
+      method: 'POST',
+      body: JSON.stringify({ name, description: description || '' }),
+    });
+  }
+
+  async updatePipeline(pipeline: any) {
+    return this.request(`/pg2pg/pipelines/${pipeline.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(pipeline),
+    });
+  }
+
+  async deletePipeline(id: string) {
+    return this.request(`/pg2pg/pipelines/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async addStepToPipeline(pipelineId: string, step: any) {
+    return this.request(`/pg2pg/pipelines/${pipelineId}/steps`, {
+      method: 'POST',
+      body: JSON.stringify(step),
+    });
+  }
+
+  async updateStep(stepId: string, step: any) {
+    return this.request(`/pg2pg/pipelines/steps/${stepId}`, {
+      method: 'PUT',
+      body: JSON.stringify(step),
+    });
+  }
+
+  async deleteStep(stepId: string) {
+    return this.request(`/pg2pg/pipelines/steps/${stepId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async savePipelineConnection(pipelineId: string, type: 'source' | 'target', connection: any) {
+    return this.request(`/pg2pg/pipelines/${pipelineId}/connections/${type}`, {
+      method: 'POST',
+      body: JSON.stringify(connection),
+    });
+  }
+
+  async startPipeline(pipelineId: string) {
+    return this.request(`/pg2pg/pipelines/${pipelineId}/start`, {
+      method: 'POST',
+    });
+  }
+
+  async stopPipeline(pipelineId: string) {
+    return this.request(`/pg2pg/pipelines/${pipelineId}/stop`, {
+      method: 'POST',
+    });
+  }
+
+  async getPipelineLogs(pipelineId: string, executionId?: string) {
+    const query = executionId ? `?executionId=${encodeURIComponent(executionId)}` : '';
+    return this.request(`/pg2pg/pipelines/${pipelineId}/logs${query}`);
+  }
+
+  async getPipelineExecutions(pipelineId: string) {
+    return this.request(`/pg2pg/pipelines/${pipelineId}/executions`);
+  }
 }
 
 export const apiService = new ApiService();

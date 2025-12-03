@@ -6,7 +6,7 @@ import { defaultDataTypeMappings } from "@/lib/data-type-mappings"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { SearchIcon, PlusIcon, ArrowRightIcon, OracleIcon, PostgresIcon, AlertIcon } from "./icons"
+import { SearchIcon, PlusIcon, ArrowRightIcon, OracleIcon, PostgresIcon, AlertIcon } from "../icons"
 import { cn } from "@/lib/utils"
 
 export function DataTypeRules() {

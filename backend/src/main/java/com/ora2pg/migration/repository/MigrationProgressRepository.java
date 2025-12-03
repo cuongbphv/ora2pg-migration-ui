@@ -14,3 +14,4 @@ public interface MigrationProgressRepository extends JpaRepository<MigrationProg
 }
 
 
+

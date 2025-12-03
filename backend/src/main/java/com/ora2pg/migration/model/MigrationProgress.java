@@ -19,6 +19,7 @@ public class MigrationProgress {
     private Long migratedRows;
     private String currentTable;
     private LocalDateTime startTime;
+    private LocalDateTime endTime;
     private LocalDateTime estimatedEndTime;
     private String status; // "idle", "running", "paused", "completed", "error"
     private List<MigrationLog> logs;

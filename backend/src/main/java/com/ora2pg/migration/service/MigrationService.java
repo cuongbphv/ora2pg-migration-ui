@@ -457,6 +457,7 @@ public class MigrationService {
             
             if (tablesToMigrate.isEmpty()) {
                 progress.setStatus("completed");
+                progress.setEndTime(LocalDateTime.now());
                 progress.setCurrentTable(null);
                 saveProgressToDatabase(progress.getProjectId(), progress);
                 addLog(progress, "success", "Migration completed successfully", null);
@@ -482,6 +483,7 @@ public class MigrationService {
             }
             
             progress.setStatus("completed");
+            progress.setEndTime(LocalDateTime.now());
             progress.setCurrentTable(null);
             saveProgressToDatabase(progress.getProjectId(), progress);
             addLog(progress, "success", "Migration completed successfully", null);
@@ -499,6 +501,7 @@ public class MigrationService {
                     tableExecutor.shutdownNow();
                 }
                 progress.setStatus("error");
+                progress.setEndTime(LocalDateTime.now());
                 progress.setCurrentTable(null);
                 saveProgressToDatabase(progress.getProjectId(), progress);
                 addLog(progress, "error", "Migration failed: " + failure.getMessage(), failure.toString());
@@ -1126,6 +1129,9 @@ public class MigrationService {
             progress.setStatus("idle");
         } else if (completedTables == totalTables) {
             progress.setStatus("completed");
+            if (progress.getEndTime() == null) {
+                progress.setEndTime(LocalDateTime.now());
+            }
         } else {
             progress.setStatus("paused"); // Assume paused if partially completed
         }
@@ -1156,6 +1162,7 @@ public class MigrationService {
             entity.setMigratedRows(progress.getMigratedRows());
             entity.setCurrentTable(progress.getCurrentTable());
             entity.setStartTime(progress.getStartTime());
+            entity.setEndTime(progress.getEndTime());
             entity.setEstimatedEndTime(progress.getEstimatedEndTime());
             
             migrationProgressRepository.save(entity);
@@ -1174,6 +1181,7 @@ public class MigrationService {
         progress.setMigratedRows(entity.getMigratedRows());
         progress.setCurrentTable(entity.getCurrentTable());
         progress.setStartTime(entity.getStartTime());
+        progress.setEndTime(entity.getEndTime());
         progress.setEstimatedEndTime(entity.getEstimatedEndTime());
         return progress;
     }

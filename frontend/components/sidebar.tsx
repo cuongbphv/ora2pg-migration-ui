@@ -43,6 +43,7 @@ const navItems = [
   { id: "tables", label: "Table Mapping", icon: TableIcon },
   { id: "datatypes", label: "Data Types", icon: SettingsIcon },
   { id: "migration", label: "Migration", icon: FolderIcon },
+  { id: "pg2pg", label: "PG2PG Pipeline", icon: DatabaseIcon },
 ]
 
 export function Sidebar({

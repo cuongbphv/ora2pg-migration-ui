@@ -82,6 +82,7 @@ export interface MigrationProgress {
   migratedRows: number
   currentTable?: string
   startTime?: Date
+  endTime?: Date
   estimatedEndTime?: Date
   status: "idle" | "running" | "paused" | "completed" | "error"
   logs: MigrationLog[]
