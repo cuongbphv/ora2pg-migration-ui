@@ -16,3 +16,5 @@ public class DataTypeMappingRule {
     private Boolean isCustom;
 }
 
+
+

@@ -48,6 +48,7 @@ public class SettingsService {
         settings.setSkipErrors(getBoolValue(settingsMap, "skipErrors", false));
         settings.setMaxErrors(getIntValue(settingsMap, "maxErrors", 100));
         settings.setAutoCommit(getBoolValue(settingsMap, "autoCommit", false));
+        settings.setColumnNamingStrategy(getStringValue(settingsMap, "columnNamingStrategy", "lowercase"));
         
         // Table Discovery settings
         settings.setTableNameFilter(getStringValue(settingsMap, "tableNameFilter", ""));
@@ -84,6 +85,7 @@ public class SettingsService {
         saveSetting("skipErrors", String.valueOf(settings.getSkipErrors()), "migration", "boolean", "Skip errors");
         saveSetting("maxErrors", String.valueOf(settings.getMaxErrors()), "migration", "number", "Max errors");
         saveSetting("autoCommit", String.valueOf(settings.getAutoCommit()), "migration", "boolean", "Auto commit mode");
+        saveSetting("columnNamingStrategy", settings.getColumnNamingStrategy() != null ? settings.getColumnNamingStrategy() : "lowercase", "migration", "string", "Column naming strategy: lowercase, uppercase, original, camelCase, snake_case, pascalCase");
         
         // Table Discovery
         saveSetting("tableNameFilter", settings.getTableNameFilter() != null ? settings.getTableNameFilter() : "", "discovery", "string", "Table name filter pattern (SQL LIKE, e.g., TRADE_%)");

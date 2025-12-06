@@ -15,6 +15,16 @@ import { apiService } from "@/lib/api"
 import type { Project, ConnectionConfig, AppSettings } from "@/lib/types"
 import PGPipelineBuilder from "@/components/pg2pg/pg-pipeline-builder"
 import PGPipelineManager from "@/components/pg2pg/pg-pipeline-manager"
+import { DataValidationPage } from "@/components/advanced/data-validation-page"
+import { SchemaMigrationPage } from "@/components/advanced/schema-migration-page"
+import { CollaborationPage } from "@/components/advanced/collaboration-page"
+import { PerformancePage } from "@/components/advanced/performance-page"
+import { ReportsPage } from "@/components/advanced/reports-page"
+import { RollbackPage } from "@/components/advanced/rollback-page"
+import { SchedulerPage } from "@/components/advanced/scheduler-page"
+import { TemplatesPage } from "@/components/advanced/templates-page"
+import { toast } from "sonner"
+import { EmailTemplatePage } from "@/components/advanced/email-template-page"
 
 function MainContent() {
   const { user, logout, isLoading: authLoading } = useAuth()
@@ -67,7 +77,7 @@ function MainContent() {
           setSelectedProjectId(result.data[0].id)
         }
       } else if (result.error) {
-        console.error("Failed to load projects:", result.error)
+        toast.error("Failed to load projects: " + result?.error)
         // If it's an auth error, the auth context will handle it
         if (result.error.includes("Authentication")) {
           // Token might be invalid, let auth context handle it
@@ -75,7 +85,7 @@ function MainContent() {
         }
       }
     } catch (error) {
-      console.error("Failed to load projects:", error)
+      toast.error("Failed to load projects: " + (error instanceof Error ? error.message : "Unknown error"))
     } finally {
       setLoading(false)
     }
@@ -148,7 +158,15 @@ function MainContent() {
           />
         )
       case "tables":
-        return <TableMappingView projectId={selectedProjectId} appSettings={appSettings} />
+        return (
+          <TableMappingView
+            projectId={selectedProjectId}
+            appSettings={{
+              tableNameFilter: appSettings.tableNameFilter,
+              columnNamingStrategy: appSettings.columnNamingStrategy,
+            }}
+          />
+        )
       case "datatypes":
         return <DataTypeRules />
       case "migration":
@@ -159,6 +177,25 @@ function MainContent() {
         ) : (
           <PGPipelineManager onSelectPipeline={setSelectedPipelineId} />
         )
+      // Roadmap pages
+      case "validation":
+        return <DataValidationPage />
+      case "schema":
+        return <SchemaMigrationPage />
+      case "scheduler":
+        return <SchedulerPage />
+      case "templates":
+        return <TemplatesPage />
+      case "rollback":
+        return <RollbackPage />
+      case "performance":
+        return <PerformancePage />
+      case "reports":
+        return <ReportsPage />
+      case "collaboration":
+        return <CollaborationPage />
+      case "email-templates":
+        return <EmailTemplatePage />
       default:
         return <Dashboard project={selectedProject} />
     }

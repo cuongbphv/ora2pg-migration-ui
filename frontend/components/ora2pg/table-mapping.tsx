@@ -31,15 +31,16 @@ import {
   XIcon,
   RefreshIcon,
   CheckIcon,
-} from "../icons"
+} from "@/components/icons"
 import { cn } from "@/lib/utils"
 import { oracleToPostgresTypes } from "@/lib/data-type-mappings"
 import { apiService } from "@/lib/api"
 import { toast } from "@/lib/toast"
+import { transformColumnName, type ColumnNamingStrategy } from "@/lib/column-name-transformer"
 
 interface TableMappingProps {
   projectId?: string | null
-  appSettings?: { tableNameFilter?: string }
+  appSettings?: { tableNameFilter?: string; columnNamingStrategy?: string }
 }
 
 export function TableMappingView({ projectId, appSettings }: TableMappingProps) {
@@ -91,7 +92,18 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
   const saveTableMappings = useCallback(async (updatedTables: TableMapping[]) => {
     if (!projectId) return
     try {
-      const result = await apiService.saveTableMappings(projectId, updatedTables)
+      // Clear IDs before sending to backend - let backend generate new UUIDs
+      // This prevents optimistic locking issues when frontend uses composite IDs like "SCHEMA.TABLE"
+      const tablesWithoutIds = updatedTables.map(table => ({
+        ...table,
+        id: undefined, // Clear table ID
+        columnMappings: table.columnMappings?.map(col => ({
+          ...col,
+          id: undefined, // Clear column ID
+        })) || [],
+      }))
+      
+      const result = await apiService.saveTableMappings(projectId, tablesWithoutIds)
       if (result.data) {
         const projectData = result.data as Project
         setProject(projectData)
@@ -149,29 +161,24 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
         t.id === tableId ? tableToSave : t
       )
       
-      const result = await apiService.saveTableMappings(projectId, updatedTables)
-      if (result.data) {
-        const projectData = result.data as Project
-        setProject(projectData)
-        const mappings = (projectData.tableMappings || []) as TableMapping[]
-        setTables(mappings)
-        
-        // Clear unsaved changes for this table
-        setUnsavedChanges((prev) => {
-          const newSet = new Set(prev)
-          newSet.delete(tableId)
-          return newSet
-        })
-        
-        toast.success("Table settings saved", "Migration options updated successfully")
-      }
+      // Use the saveTableMappings function which handles ID clearing
+      await saveTableMappings(updatedTables)
+      
+      // Clear unsaved changes for this table
+      setUnsavedChanges((prev) => {
+        const newSet = new Set(prev)
+        newSet.delete(tableId)
+        return newSet
+      })
+      
+      toast.success("Table settings saved", "Migration options updated successfully")
     } catch (error) {
       console.error("Failed to save table metadata:", error)
       toast.error("Failed to save table settings", "Please try again")
     } finally {
       setSavingTableId(null)
     }
-  }, [projectId, tables])
+  }, [projectId, tables, saveTableMappings])
 
   const handleDiscoverTables = async () => {
     if (!project || !project.sourceConnection || !project.sourceConnection.schema) {
@@ -187,13 +194,16 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
         appSettings?.tableNameFilter
       )
       if (result.data) {
+        // Get column naming strategy from settings (default to lowercase)
+        const columnNamingStrategy = (appSettings?.columnNamingStrategy || "lowercase") as ColumnNamingStrategy
+        
         // Convert TableInfo to TableMapping format
         const tableInfos = result.data as any[]
         const discoveredMappings: TableMapping[] = tableInfos.map((table: any) => ({
           id: `${table.schema}.${table.tableName}`,
           sourceTable: table.tableName,
           sourceSchema: table.schema,
-          targetTable: table.tableName.toLowerCase(),
+          targetTable: table.tableName.toLowerCase(), // Keep table names as lowercase
           targetSchema: project.targetConnection?.schema || "public",
           enabled: true,
           status: "pending" as const,
@@ -204,7 +214,8 @@ export function TableMappingView({ projectId, appSettings }: TableMappingProps) 
             sourceDataLength: col.dataLength || undefined,
             sourceDataPrecision: col.dataPrecision || undefined,
             sourceDataScale: col.dataScale || undefined,
-            targetColumn: col.columnName.toLowerCase(),
+            // Apply column naming strategy from settings
+            targetColumn: transformColumnName(col.columnName, columnNamingStrategy),
             targetDataType: mapDataType(col.dataType || "VARCHAR", col.dataLength, col.dataPrecision, col.dataScale),
             targetDataLength: col.dataLength || undefined,
             targetDataPrecision: col.dataPrecision || undefined,

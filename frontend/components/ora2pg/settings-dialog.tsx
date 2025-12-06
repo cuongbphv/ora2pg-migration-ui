@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { CpuIcon, MailIcon, FileTextIcon, ZapIcon, SaveIcon, SearchIcon } from "../icons"
+import { CpuIcon, MailIcon, FileTextIcon, ZapIcon, SaveIcon, SearchIcon } from "@/components/icons"
 import type { AppSettings } from "@/lib/types"
 
 interface SettingsDialogProps {
@@ -40,6 +40,7 @@ const defaultSettings: AppSettings = {
   skipErrors: false,
   maxErrors: 100,
   autoCommit: false,
+  columnNamingStrategy: "lowercase",
   tableNameFilter: "",
 }
 
@@ -383,6 +384,31 @@ export function SettingsDialog({
                 checked={localSettings.autoCommit}
                 onCheckedChange={(checked) => updateSetting("autoCommit", checked)}
               />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Column Naming Strategy</Label>
+              <Select
+                value={localSettings.columnNamingStrategy || "lowercase"}
+                onValueChange={(value: AppSettings["columnNamingStrategy"]) => 
+                  updateSetting("columnNamingStrategy", value || "lowercase")
+                }
+              >
+                <SelectTrigger className="bg-input border-border">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="lowercase">lowercase (USER_ID → user_id)</SelectItem>
+                  <SelectItem value="uppercase">UPPERCASE (user_id → USER_ID)</SelectItem>
+                  <SelectItem value="original">Original (keep as-is, preserves Oracle UPPERCASE)</SelectItem>
+                  <SelectItem value="camelCase">camelCase (USER_ID → userId)</SelectItem>
+                  <SelectItem value="snake_case">snake_case (USER_ID → user_id)</SelectItem>
+                  <SelectItem value="pascalCase">PascalCase (USER_ID → UserId)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Choose how column names are transformed during migration. Oracle columns are typically UPPERCASE.
+              </p>
             </div>
           </TabsContent>
         </Tabs>

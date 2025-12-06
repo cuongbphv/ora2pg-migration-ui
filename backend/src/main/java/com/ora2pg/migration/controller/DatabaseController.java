@@ -56,7 +56,13 @@ public class DatabaseController {
                 .map(this::convertToTableInfo)
                 .toList();
             
-            List<TableMapping> mappings = databaseService.autoMapTables(sourceTables, targetSchema);
+            // Get column naming strategy from settings
+            String columnNamingStrategy = settingsService.getSettings().getColumnNamingStrategy();
+            if (columnNamingStrategy == null || columnNamingStrategy.isEmpty()) {
+                columnNamingStrategy = "lowercase"; // Default
+            }
+            
+            List<TableMapping> mappings = databaseService.autoMapTables(sourceTables, targetSchema, columnNamingStrategy);
             return ResponseEntity.ok(mappings);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().build();

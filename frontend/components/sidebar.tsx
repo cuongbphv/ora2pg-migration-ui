@@ -15,7 +15,16 @@ import {
   ChevronRightIcon,
   UserIcon,
   LogOutIcon,
-} from "./icons"
+  ShieldCheckIcon,
+  LayersIcon,
+  CalendarIcon,
+  CopyIcon,
+  RotateCcwIcon,
+  BarChart2Icon,
+  FileTextIcon,
+  UsersIcon,
+  MailIcon,
+} from "@/components/icons"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -43,7 +52,22 @@ const navItems = [
   { id: "tables", label: "Table Mapping", icon: TableIcon },
   { id: "datatypes", label: "Data Types", icon: SettingsIcon },
   { id: "migration", label: "Migration", icon: FolderIcon },
+]
+
+const pipelineItems = [
   { id: "pg2pg", label: "PG2PG Pipeline", icon: DatabaseIcon },
+]
+
+const roadmapItems = [
+  { id: "validation", label: "Data Validation", icon: ShieldCheckIcon },
+  { id: "schema", label: "Schema Migration", icon: LayersIcon },
+  { id: "scheduler", label: "Scheduler", icon: CalendarIcon },
+  { id: "templates", label: "Templates", icon: CopyIcon },
+  { id: "rollback", label: "Rollback", icon: RotateCcwIcon },
+  { id: "performance", label: "Performance", icon: BarChart2Icon },
+  { id: "reports", label: "Reports", icon: FileTextIcon },
+  { id: "collaboration", label: "Collaboration", icon: UsersIcon },
+  { id: "email-templates", label: "Email Templates", icon: MailIcon },
 ]
 
 export function Sidebar({
@@ -58,6 +82,7 @@ export function Sidebar({
   onOpenSettings,
 }: SidebarProps) {
   const [projectsExpanded, setProjectsExpanded] = useState(true)
+  const [roadmapExpanded, setRoadmapExpanded] = useState(true)
 
   return (
     <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col h-screen">
@@ -83,25 +108,33 @@ export function Sidebar({
 
       {/* Projects Section */}
       <div className="p-2">
-        <div className="flex items-center justify-between w-full px-2 py-1.5 text-sm text-muted-foreground rounded-md hover:bg-sidebar-accent transition-colors">
-          <button
-            onClick={() => setProjectsExpanded(!projectsExpanded)}
-            className="flex items-center gap-2 hover:text-sidebar-foreground flex-1 text-left"
-          >
+        <button
+          onClick={() => setProjectsExpanded(!projectsExpanded)}
+          className="flex items-center justify-between w-full px-2 py-1.5 text-sm text-muted-foreground hover:text-sidebar-foreground rounded-md hover:bg-sidebar-accent transition-colors"
+        >
+          <span className="flex items-center gap-2">
             {projectsExpanded ? <ChevronDownIcon className="w-4 h-4" /> : <ChevronRightIcon className="w-4 h-4" />}
             Projects
-          </button>
-          <button
+          </span>
+          <div
             onClick={(e) => {
               e.stopPropagation()
               onNewProject()
             }}
-            className="p-1 hover:bg-sidebar-accent rounded hover:text-sidebar-foreground"
-            aria-label="New Project"
+            className="p-1 hover:bg-sidebar-accent rounded cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                e.stopPropagation()
+                onNewProject()
+              }
+            }}
           >
             <PlusIcon className="w-4 h-4" />
-          </button>
-        </div>
+          </div>
+        </button>
 
         {projectsExpanded && (
           <div className="mt-1 space-y-0.5">
@@ -137,7 +170,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-2 mt-4">
+      <nav className="flex-1 p-2 mt-2 overflow-y-auto">
         <p className="px-2 mb-2 text-xs font-medium text-muted-foreground uppercase tracking-wider">Configuration</p>
         <div className="space-y-0.5">
           {navItems.map((item) => (
@@ -155,6 +188,56 @@ export function Sidebar({
               {item.label}
             </button>
           ))}
+        </div>
+
+        <p className="px-2 mb-2 mt-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Pipelines</p>
+        <div className="space-y-0.5">
+          {pipelineItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => onTabChange(item.id)}
+              className={cn(
+                "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
+                activeTab === item.id
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                  : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent",
+              )}
+            >
+              <item.icon className="w-4 h-4" />
+              {item.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4">
+          <button
+            onClick={() => setRoadmapExpanded(!roadmapExpanded)}
+            className="flex items-center justify-between w-full px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider hover:text-sidebar-foreground rounded-md hover:bg-sidebar-accent transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              {roadmapExpanded ? <ChevronDownIcon className="w-3 h-3" /> : <ChevronRightIcon className="w-3 h-3" />}
+              Advanced
+            </span>
+          </button>
+          {roadmapExpanded && (
+            <div className="mt-1 space-y-0.5">
+              {roadmapItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => onTabChange(item.id)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors",
+                    activeTab === item.id
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-muted-foreground hover:text-sidebar-foreground hover:bg-sidebar-accent",
+                  )}
+                >
+                  <item.icon className="w-4 h-4" />
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </nav>
 

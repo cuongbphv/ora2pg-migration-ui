@@ -2,7 +2,7 @@
 
 import type { Project } from "@/lib/types"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { OracleIcon, PostgresIcon, TableIcon, CheckIcon, ClockIcon } from "../icons"
+import { OracleIcon, PostgresIcon, TableIcon, CheckIcon, ClockIcon } from "@/components/icons"
 import { Progress } from "@/components/ui/progress"
 
 interface DashboardProps {

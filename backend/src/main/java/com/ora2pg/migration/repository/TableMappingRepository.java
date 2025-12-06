@@ -14,5 +14,10 @@ public interface TableMappingRepository extends JpaRepository<TableMappingEntity
     @Transactional
     @Query("UPDATE TableMappingEntity t SET t.status = :status WHERE t.id = :id")
     void updateStatus(@Param("id") String id, @Param("status") String status);
+    
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM TableMappingEntity t WHERE t.project.id = :projectId")
+    void deleteByProjectId(@Param("projectId") String projectId);
 }
 

@@ -126,6 +126,7 @@ export interface AppSettings {
   skipErrors: boolean
   maxErrors: number
   autoCommit: boolean
+  columnNamingStrategy?: "lowercase" | "uppercase" | "original" | "camelCase" | "snake_case" | "pascalCase"
   
   // Table Discovery
   tableNameFilter?: string // SQL LIKE pattern for filtering tables (e.g., "TBL_%")

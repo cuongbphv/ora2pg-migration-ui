@@ -1,6 +1,7 @@
 package com.ora2pg.migration.service;
 
 import com.ora2pg.migration.model.*;
+import com.ora2pg.migration.util.ColumnNameTransformer;
 import com.ora2pg.migration.util.DatabaseConnectionManager;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -271,15 +272,20 @@ public class DatabaseService {
         return 0L;
     }
     
-    public List<TableMapping> autoMapTables(List<TableInfo> sourceTables, String targetSchema) {
+    public List<TableMapping> autoMapTables(List<TableInfo> sourceTables, String targetSchema, String columnNamingStrategy) {
         List<TableMapping> mappings = new ArrayList<>();
+        
+        // Default to lowercase if strategy is not provided
+        if (columnNamingStrategy == null || columnNamingStrategy.isEmpty()) {
+            columnNamingStrategy = "lowercase";
+        }
         
         for (TableInfo sourceTable : sourceTables) {
             TableMapping mapping = new TableMapping(
                 UUID.randomUUID().toString(),
                 sourceTable.getTableName(),
                 sourceTable.getSchema(),
-                sourceTable.getTableName().toLowerCase(), // Default: lowercase target name
+                ColumnNameTransformer.transform(sourceTable.getTableName(), columnNamingStrategy),
                 targetSchema != null ? targetSchema : "public"
             );
             
@@ -293,7 +299,8 @@ public class DatabaseService {
                 colMapping.setSourceDataLength(col.getDataLength());
                 colMapping.setSourceDataPrecision(col.getDataPrecision());
                 colMapping.setSourceDataScale(col.getDataScale());
-                colMapping.setTargetColumn(col.getColumnName().toLowerCase());
+                // Apply column naming strategy
+                colMapping.setTargetColumn(ColumnNameTransformer.transform(col.getColumnName(), columnNamingStrategy));
                 
                 // Map data type and preserve length/precision/scale
                 String mappedType = mapDataTypeWithLength(col.getDataType(), col.getDataLength(), col.getDataPrecision(), col.getDataScale());

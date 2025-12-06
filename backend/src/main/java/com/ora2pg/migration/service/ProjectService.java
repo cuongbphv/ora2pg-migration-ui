@@ -1,6 +1,7 @@
 package com.ora2pg.migration.service;
 
 import com.ora2pg.migration.entity.ProjectEntity;
+import com.ora2pg.migration.entity.TableMappingEntity;
 import com.ora2pg.migration.entity.User;
 import com.ora2pg.migration.mapper.ProjectMapper;
 import com.ora2pg.migration.model.Project;
@@ -149,8 +150,7 @@ public class ProjectService {
         // Add new mappings
         ProjectEntity finalEntity = entity;
         tableMappings.forEach(tm -> {
-            com.ora2pg.migration.entity.TableMappingEntity tmEntity = 
-                    projectMapper.toTableMappingEntity(tm, finalEntity);
+            TableMappingEntity tmEntity = projectMapper.toTableMappingEntity(tm, finalEntity);
             finalEntity.getTableMappings().add(tmEntity);
         });
         

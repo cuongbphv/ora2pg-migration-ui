@@ -3,6 +3,7 @@ package com.ora2pg.migration.service;
 import com.ora2pg.migration.entity.MigrationLogEntity;
 import com.ora2pg.migration.entity.MigrationProgressEntity;
 import com.ora2pg.migration.entity.ProjectEntity;
+import com.ora2pg.migration.entity.TableMappingEntity;
 import com.ora2pg.migration.model.*;
 import com.ora2pg.migration.repository.MigrationLogRepository;
 import com.ora2pg.migration.repository.MigrationProgressRepository;
@@ -447,6 +448,7 @@ public class MigrationService {
                 createTargetTables(project, progress);
             } else {
                 addLog(progress, "info", "Migration resumed (parallel tables enabled)", null);
+                createTargetTables(project, progress);
             }
             
             List<TableMapping> tablesToMigrate = project.getTableMappings()
@@ -741,7 +743,8 @@ public class MigrationService {
             StringBuilder selectCols = new StringBuilder();
             for (ColumnMapping col : tableMapping.getColumnMappings()) {
                 if (selectCols.length() > 0) selectCols.append(", ");
-                selectCols.append(col.getSourceColumn());
+                // Quote source column names to handle uppercase/mixed case
+                selectCols.append(quoteIdentifier(col.getSourceColumn()));
             }
             
             String selectSql = String.format("SELECT %s FROM %s.%s",
@@ -765,7 +768,8 @@ public class MigrationService {
                     insertCols.append(", ");
                     insertVals.append(", ");
                 }
-                insertCols.append(col.getTargetColumn());
+                // Quote target column names to handle uppercase/mixed case (PostgreSQL requirement)
+                insertCols.append(quoteIdentifier(col.getTargetColumn()));
                 insertVals.append("?");
             }
             
@@ -993,7 +997,6 @@ public class MigrationService {
     
     private void addLog(MigrationProgress progress, String level, String message, String details) {
         MigrationLog log = new MigrationLog();
-        log.setId(UUID.randomUUID().toString());
         log.setTimestamp(LocalDateTime.now());
         log.setLevel(level);
         log.setMessage(message);
@@ -1007,7 +1010,6 @@ public class MigrationService {
             ProjectEntity project = projectRepository.findById(progress.getProjectId()).orElse(null);
             if (project != null) {
                 MigrationLogEntity logEntity = new MigrationLogEntity();
-                logEntity.setId(log.getId());
                 logEntity.setTimestamp(log.getTimestamp());
                 logEntity.setLevel(log.getLevel());
                 logEntity.setMessage(log.getMessage());
@@ -1101,13 +1103,12 @@ public class MigrationService {
         }
         
         // Calculate from table mappings
-        List<com.ora2pg.migration.entity.TableMappingEntity> tableMappings = 
-            projectEntity.getTableMappings();
+        List<TableMappingEntity> tableMappings = projectEntity.getTableMappings();
         
         int totalTables = tableMappings.size();
         int completedTables = 0;
         
-        for (com.ora2pg.migration.entity.TableMappingEntity mapping : tableMappings) {
+        for (TableMappingEntity mapping : tableMappings) {
             if ("migrated".equals(mapping.getStatus())) {
                 completedTables++;
             }
