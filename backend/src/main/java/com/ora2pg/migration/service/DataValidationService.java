@@ -1,6 +1,8 @@
 package com.ora2pg.migration.service;
 
 import com.ora2pg.migration.model.*;
+import com.ora2pg.migration.model.validation.ChecksumResult;
+import com.ora2pg.migration.model.validation.DryRunResult;
 import com.ora2pg.migration.util.DatabaseConnectionManager;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -100,8 +102,8 @@ public class DataValidationService {
     /**
      * Calculate and compare checksums between source and target tables
      */
-    public List<ChecksumResult> compareChecksums(String projectId, List<String> tableNames, 
-                                                  String algorithm, List<String> columnsToInclude) {
+    public List<ChecksumResult> compareChecksums(String projectId, List<String> tableNames,
+                                                 String algorithm, List<String> columnsToInclude) {
         List<ChecksumResult> results = new ArrayList<>();
         
         try {

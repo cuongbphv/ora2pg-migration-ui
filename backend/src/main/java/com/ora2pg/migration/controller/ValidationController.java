@@ -1,6 +1,9 @@
 package com.ora2pg.migration.controller;
 
 import com.ora2pg.migration.model.*;
+import com.ora2pg.migration.model.validation.ChecksumResult;
+import com.ora2pg.migration.model.validation.DryRunResult;
+import com.ora2pg.migration.model.validation.ValidationRequest;
 import com.ora2pg.migration.service.DataValidationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

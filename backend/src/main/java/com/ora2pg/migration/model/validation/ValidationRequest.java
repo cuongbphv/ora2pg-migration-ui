@@ -1,4 +1,4 @@
-package com.ora2pg.migration.model;
+package com.ora2pg.migration.model.validation;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

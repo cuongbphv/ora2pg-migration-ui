@@ -181,7 +181,7 @@ function MainContent() {
       case "validation":
         return <DataValidationPage projectId={selectedProjectId || ""} project={selectedProject || undefined} />
       case "schema":
-        return <SchemaMigrationPage />
+        return <SchemaMigrationPage projectId={selectedProjectId || ""} project={selectedProject || undefined} />
       case "scheduler":
         return <SchedulerPage />
       case "templates":

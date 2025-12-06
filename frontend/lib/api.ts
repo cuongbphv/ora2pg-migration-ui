@@ -412,6 +412,63 @@ class ApiService {
       }),
     });
   }
+
+  // Schema Migration
+  async generateSchemaDDL(projectId: string, options?: {
+    targetSchema?: string;
+    includeIndexes?: boolean;
+    includeConstraints?: boolean;
+    includeSequences?: boolean;
+    includeViews?: boolean;
+    includeFunctions?: boolean;
+    includeProcedures?: boolean;
+    includeTriggers?: boolean;
+    tableNames?: string[];
+  }) {
+    return this.request('/schema/generate-ddl', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId,
+        targetSchema: options?.targetSchema || 'public',
+        includeIndexes: options?.includeIndexes !== false,
+        includeConstraints: options?.includeConstraints !== false,
+        includeSequences: options?.includeSequences !== false,
+        includeViews: options?.includeViews !== false,
+        includeFunctions: options?.includeFunctions || false,
+        includeProcedures: options?.includeProcedures || false,
+        includeTriggers: options?.includeTriggers || false,
+        tableNames: options?.tableNames || null,
+      }),
+    });
+  }
+
+  async generateAllSchemaDDL(projectId: string, options?: {
+    targetSchema?: string;
+    includeIndexes?: boolean;
+    includeConstraints?: boolean;
+    includeSequences?: boolean;
+    includeViews?: boolean;
+    includeFunctions?: boolean;
+    includeProcedures?: boolean;
+    includeTriggers?: boolean;
+    tableNames?: string[];
+  }) {
+    return this.request('/schema/generate-ddl/all', {
+      method: 'POST',
+      body: JSON.stringify({
+        projectId,
+        targetSchema: options?.targetSchema || 'public',
+        includeIndexes: options?.includeIndexes !== false,
+        includeConstraints: options?.includeConstraints !== false,
+        includeSequences: options?.includeSequences !== false,
+        includeViews: options?.includeViews !== false,
+        includeFunctions: options?.includeFunctions || false,
+        includeProcedures: options?.includeProcedures || false,
+        includeTriggers: options?.includeTriggers || false,
+        tableNames: options?.tableNames || null,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();
