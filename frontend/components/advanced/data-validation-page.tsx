@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,102 +19,222 @@ import {
   ClockIcon,
   TableIcon,
   SearchIcon,
+  CopyIcon,
 } from "@/components/icons"
+import { apiService } from "@/lib/api"
+import { toast } from "@/lib/toast"
+import type { Project } from "@/lib/types"
 
 interface RowCountResult {
   table: string
+  sourceSchema?: string
+  targetSchema?: string
   sourceCount: number
   targetCount: number
   match: boolean
   difference: number
+  status?: string
+  errorMessage?: string
 }
 
 interface ChecksumResult {
   table: string
+  sourceSchema?: string
+  targetSchema?: string
   sourceChecksum: string
   targetChecksum: string
   match: boolean
   algorithm: string
+  status?: string
+  errorMessage?: string
+  rowCount?: number
 }
 
 interface DryRunResult {
   table: string
+  sourceSchema?: string
+  targetSchema?: string
   rowCount: number
   estimatedSize: string
   estimatedTime: string
   issues: string[]
   ddlPreview: string
+  status?: string
+  errorMessage?: string
 }
 
-export function DataValidationPage() {
+interface DataValidationPageProps {
+  projectId: string
+  project?: Project
+}
+
+export function DataValidationPage({ projectId, project: initialProject }: DataValidationPageProps) {
   const [activeTab, setActiveTab] = useState("rowcount")
   const [isRunning, setIsRunning] = useState(false)
   const [progress, setProgress] = useState(0)
   const [selectedTables, setSelectedTables] = useState<string[]>([])
-  const [checksumAlgorithm, setChecksumAlgorithm] = useState("md5")
+  const [checksumAlgorithm, setChecksumAlgorithm] = useState("MD5")
+  const [project, setProject] = useState<Project | null>(initialProject || null)
+  const [loading, setLoading] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
 
-  // Mock data
-  const [rowCountResults, setRowCountResults] = useState<RowCountResult[]>([
-    { table: "EMPLOYEES", sourceCount: 107500, targetCount: 107500, match: true, difference: 0 },
-    { table: "DEPARTMENTS", sourceCount: 27, targetCount: 27, match: true, difference: 0 },
-    { table: "ORDERS", sourceCount: 2843567, targetCount: 2843560, match: false, difference: 7 },
-    { table: "CUSTOMERS", sourceCount: 150000, targetCount: 150000, match: true, difference: 0 },
-    { table: "PRODUCTS", sourceCount: 8500, targetCount: 8500, match: true, difference: 0 },
-  ])
+  const [rowCountResults, setRowCountResults] = useState<RowCountResult[]>([])
+  const [checksumResults, setChecksumResults] = useState<ChecksumResult[]>([])
+  const [dryRunResults, setDryRunResults] = useState<DryRunResult[]>([])
 
-  const [checksumResults, setChecksumResults] = useState<ChecksumResult[]>([
-    {
-      table: "EMPLOYEES",
-      sourceChecksum: "a1b2c3d4e5f6",
-      targetChecksum: "a1b2c3d4e5f6",
-      match: true,
-      algorithm: "MD5",
-    },
-    {
-      table: "DEPARTMENTS",
-      sourceChecksum: "f6e5d4c3b2a1",
-      targetChecksum: "f6e5d4c3b2a1",
-      match: true,
-      algorithm: "MD5",
-    },
-    { table: "ORDERS", sourceChecksum: "1a2b3c4d5e6f", targetChecksum: "1a2b3c4d5e6g", match: false, algorithm: "MD5" },
-  ])
+  // Load project if not provided
+  useEffect(() => {
+    if (projectId && !project) {
+      loadProject()
+    }
+  }, [projectId, project])
 
-  const [dryRunResults, setDryRunResults] = useState<DryRunResult[]>([
-    {
-      table: "EMPLOYEES",
-      rowCount: 107500,
-      estimatedSize: "45 MB",
-      estimatedTime: "2m 30s",
-      issues: [],
-      ddlPreview: "CREATE TABLE employees (\n  id SERIAL PRIMARY KEY,\n  name VARCHAR(100),\n  email VARCHAR(255)\n);",
-    },
-    {
-      table: "ORDERS",
-      rowCount: 2843567,
-      estimatedSize: "1.2 GB",
-      estimatedTime: "45m 20s",
-      issues: ["Large table - consider batch migration", "INDEX on order_date may take additional 5m"],
-      ddlPreview: "CREATE TABLE orders (\n  id SERIAL PRIMARY KEY,\n  customer_id INTEGER,\n  order_date TIMESTAMP\n);",
-    },
-  ])
-
-  const runValidation = () => {
-    setIsRunning(true)
-    setProgress(0)
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsRunning(false)
-          return 100
-        }
-        return prev + 10
-      })
-    }, 500)
+  const loadProject = async () => {
+    try {
+      const result = await apiService.getProject(projectId)
+      if (result.data) {
+        setProject(result.data as Project)
+      } else if (result.error) {
+        toast.error("Failed to load project", result.error)
+      }
+    } catch (error) {
+      toast.error("Failed to load project", error instanceof Error ? error.message : "Unknown error")
+    }
   }
 
-  const availableTables = ["EMPLOYEES", "DEPARTMENTS", "ORDERS", "CUSTOMERS", "PRODUCTS", "INVENTORY", "SUPPLIERS"]
+  const runRowCountValidation = async () => {
+    if (!projectId) {
+      toast.error("No project selected")
+      return
+    }
+
+    setIsRunning(true)
+    setProgress(0)
+    try {
+      const tableNames = selectedTables.length > 0 ? selectedTables : undefined
+      const result = await apiService.compareRowCounts(projectId, tableNames)
+      
+      if (result.data) {
+        setRowCountResults(result.data as RowCountResult[])
+        toast.success("Row count validation completed")
+      } else if (result.error) {
+        toast.error("Validation failed", result.error)
+      }
+    } catch (error) {
+      toast.error("Validation failed", error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setIsRunning(false)
+      setProgress(100)
+    }
+  }
+
+  const runChecksumValidation = async () => {
+    if (!projectId) {
+      toast.error("No project selected")
+      return
+    }
+
+    setIsRunning(true)
+    setProgress(0)
+    try {
+      const tableNames = selectedTables.length > 0 ? selectedTables : undefined
+      const result = await apiService.compareChecksums(projectId, {
+        tableNames,
+        algorithm: checksumAlgorithm,
+      })
+      
+      if (result.data) {
+        setChecksumResults(result.data as ChecksumResult[])
+        toast.success("Checksum validation completed")
+      } else if (result.error) {
+        toast.error("Validation failed", result.error)
+      }
+    } catch (error) {
+      toast.error("Validation failed", error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setIsRunning(false)
+      setProgress(100)
+    }
+  }
+
+  const runDryRun = async () => {
+    if (!projectId) {
+      toast.error("No project selected")
+      return
+    }
+
+    setIsRunning(true)
+    setProgress(0)
+    try {
+      const tableNames = selectedTables.length > 0 ? selectedTables : undefined
+      const result = await apiService.performDryRun(projectId, tableNames)
+      
+      if (result.data) {
+        setDryRunResults(result.data as DryRunResult[])
+        toast.success("Dry-run completed")
+      } else if (result.error) {
+        toast.error("Dry-run failed", result.error)
+      }
+    } catch (error) {
+      toast.error("Dry-run failed", error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setIsRunning(false)
+      setProgress(100)
+    }
+  }
+
+  const runAllValidations = async () => {
+    if (!projectId) {
+      toast.error("No project selected")
+      return
+    }
+
+    setIsRunning(true)
+    setProgress(0)
+    try {
+      const tableNames = selectedTables.length > 0 ? selectedTables : undefined
+      const result = await apiService.runAllValidations(projectId, {
+        tableNames,
+        algorithm: checksumAlgorithm,
+        includeDryRun: true,
+      })
+      
+      if (result.data) {
+        const data = result.data as any
+        if (data.rowCount) setRowCountResults(data.rowCount)
+        if (data.checksum) setChecksumResults(data.checksum)
+        if (data.dryRun) setDryRunResults(data.dryRun)
+        toast.success("All validations completed")
+      } else if (result.error) {
+        toast.error("Validation failed", result.error)
+      }
+    } catch (error) {
+      toast.error("Validation failed", error instanceof Error ? error.message : "Unknown error")
+    } finally {
+      setIsRunning(false)
+      setProgress(100)
+    }
+  }
+
+  const handleRunValidation = () => {
+    if (activeTab === "rowcount") {
+      runRowCountValidation()
+    } else if (activeTab === "checksum") {
+      runChecksumValidation()
+    } else if (activeTab === "dryrun") {
+      runDryRun()
+    }
+  }
+
+  const availableTables = project?.tableMappings?.map(tm => tm.sourceTable) || []
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success("Copied to clipboard")
+    }).catch(() => {
+      toast.error("Failed to copy")
+    })
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -124,11 +244,16 @@ export function DataValidationPage() {
           <p className="text-muted-foreground">Validate data integrity between Oracle source and PostgreSQL target</p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setProgress(0)}>
+          <Button variant="outline" onClick={() => {
+            setRowCountResults([])
+            setChecksumResults([])
+            setDryRunResults([])
+            setProgress(0)
+          }}>
             <RefreshIcon className="w-4 h-4 mr-2" />
             Reset
           </Button>
-          <Button onClick={runValidation} disabled={isRunning}>
+          <Button onClick={handleRunValidation} disabled={isRunning || !projectId}>
             <PlayIcon className="w-4 h-4 mr-2" />
             {isRunning ? "Running..." : "Run Validation"}
           </Button>
@@ -175,8 +300,15 @@ export function DataValidationPage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="flex-1">
-                    <Label>Select Tables</Label>
-                    <Select>
+                    <Label className="pb-2">Select Tables</Label>
+                    <Select
+                      value={selectedTables.length === 0 ? "all" : "selected"}
+                      onValueChange={(value) => {
+                        if (value === "all") {
+                          setSelectedTables([])
+                        }
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="All tables" />
                       </SelectTrigger>
@@ -191,10 +323,15 @@ export function DataValidationPage() {
                     </Select>
                   </div>
                   <div className="flex-1">
-                    <Label>Filter</Label>
+                    <Label className="pb-2">Filter</Label>
                     <div className="relative">
                       <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                      <Input placeholder="Search tables..." className="pl-9" />
+                      <Input 
+                        placeholder="Search tables..." 
+                        className="pl-9"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
                     </div>
                   </div>
                 </div>
@@ -211,35 +348,59 @@ export function DataValidationPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {rowCountResults.map((result) => (
-                        <tr key={result.table} className="hover:bg-muted/30">
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <TableIcon className="w-4 h-4 text-muted-foreground" />
-                              <span className="font-mono text-sm">{result.table}</span>
-                            </div>
-                          </td>
-                          <td className="p-3 text-right font-mono text-sm">{result.sourceCount.toLocaleString()}</td>
-                          <td className="p-3 text-right font-mono text-sm">{result.targetCount.toLocaleString()}</td>
-                          <td className="p-3 text-right font-mono text-sm">
-                            {result.difference !== 0 && <span className="text-destructive">-{result.difference}</span>}
-                            {result.difference === 0 && <span className="text-muted-foreground">0</span>}
-                          </td>
-                          <td className="p-3 text-center">
-                            {result.match ? (
-                              <Badge className="bg-success/20 text-success border-0">
-                                <CheckIcon className="w-3 h-3 mr-1" />
-                                Match
-                              </Badge>
-                            ) : (
-                              <Badge variant="destructive">
-                                <AlertIcon className="w-3 h-3 mr-1" />
-                                Mismatch
-                              </Badge>
-                            )}
+                      {rowCountResults.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                            {loading ? "Loading..." : "No validation results. Click 'Run Validation' to start."}
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        rowCountResults
+                          .filter(r => !searchTerm || r.table.toLowerCase().includes(searchTerm.toLowerCase()))
+                          .map((result) => (
+                            <tr key={result.table} className="hover:bg-muted/30">
+                              <td className="p-3">
+                                <div className="flex items-center gap-2">
+                                  <TableIcon className="w-4 h-4 text-muted-foreground" />
+                                  <span className="font-mono text-sm">{result.table}</span>
+                                </div>
+                              </td>
+                              <td className="p-3 text-right font-mono text-sm">
+                                {result.sourceCount?.toLocaleString() ?? "N/A"}
+                              </td>
+                              <td className="p-3 text-right font-mono text-sm">
+                                {result.targetCount?.toLocaleString() ?? "N/A"}
+                              </td>
+                              <td className="p-3 text-right font-mono text-sm">
+                                {result.difference !== 0 && result.difference != null && (
+                                  <span className={result.difference > 0 ? "text-destructive" : "text-muted-foreground"}>
+                                    {result.difference > 0 ? "+" : ""}{result.difference}
+                                  </span>
+                                )}
+                                {result.difference === 0 && <span className="text-muted-foreground">0</span>}
+                                {result.difference == null && <span className="text-muted-foreground">-</span>}
+                              </td>
+                              <td className="p-3 text-center">
+                                {result.status === "error" ? (
+                                  <Badge variant="destructive">
+                                    <AlertIcon className="w-3 h-3 mr-1" />
+                                    Error
+                                  </Badge>
+                                ) : result.match ? (
+                                  <Badge className="bg-success/20 text-success border-0">
+                                    <CheckIcon className="w-3 h-3 mr-1" />
+                                    Match
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive">
+                                    <AlertIcon className="w-3 h-3 mr-1" />
+                                    Mismatch
+                                  </Badge>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -265,53 +426,104 @@ export function DataValidationPage() {
               <div className="space-y-4">
                 <div className="flex items-center gap-4">
                   <div className="w-48">
-                    <Label>Algorithm</Label>
+                    <Label className="pb-2">Algorithm</Label>
                     <Select value={checksumAlgorithm} onValueChange={setChecksumAlgorithm}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="md5">MD5</SelectItem>
-                        <SelectItem value="sha256">SHA-256</SelectItem>
-                        <SelectItem value="sha512">SHA-512</SelectItem>
+                        <SelectItem value="MD5">MD5</SelectItem>
+                        <SelectItem value="SHA256">SHA-256</SelectItem>
+                        <SelectItem value="SHA512">SHA-512</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex-1">
-                    <Label>Columns to Include</Label>
+                    <Label className="pb-2">Columns to Include</Label>
                     <Input placeholder="* (all columns)" />
                   </div>
                 </div>
 
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-muted/50">
+                <div className="border rounded-lg overflow-x-auto">
+                  <table className="w-full min-w-[900px]">
+                    <thead className="bg-muted/50 sticky top-0 z-10">
                       <tr>
-                        <th className="text-left p-3 text-sm font-medium">Table</th>
-                        <th className="text-left p-3 text-sm font-medium">Source Checksum</th>
-                        <th className="text-left p-3 text-sm font-medium">Target Checksum</th>
-                        <th className="text-center p-3 text-sm font-medium">Algorithm</th>
-                        <th className="text-center p-3 text-sm font-medium">Status</th>
+                        <th className="text-left p-3 text-sm font-medium min-w-[150px] sticky left-0 bg-muted/50 z-20">Table</th>
+                        <th className="text-left p-3 text-sm font-medium min-w-[250px]">Source Checksum</th>
+                        <th className="text-left p-3 text-sm font-medium min-w-[250px]">Target Checksum</th>
+                        <th className="text-center p-3 text-sm font-medium min-w-[100px]">Algorithm</th>
+                        <th className="text-center p-3 text-sm font-medium min-w-[100px]">Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {checksumResults.map((result) => (
-                        <tr key={result.table} className="hover:bg-muted/30">
-                          <td className="p-3 font-mono text-sm">{result.table}</td>
-                          <td className="p-3 font-mono text-xs text-muted-foreground">{result.sourceChecksum}</td>
-                          <td className="p-3 font-mono text-xs text-muted-foreground">{result.targetChecksum}</td>
-                          <td className="p-3 text-center">
-                            <Badge variant="outline">{result.algorithm}</Badge>
-                          </td>
-                          <td className="p-3 text-center">
-                            {result.match ? (
-                              <Badge className="bg-success/20 text-success border-0">Valid</Badge>
-                            ) : (
-                              <Badge variant="destructive">Invalid</Badge>
-                            )}
+                      {checksumResults.length === 0 ? (
+                        <tr>
+                          <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                            {loading ? "Loading..." : "No validation results. Click 'Run Validation' to start."}
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        checksumResults
+                          .filter(r => !searchTerm || r.table.toLowerCase().includes(searchTerm.toLowerCase()))
+                          .map((result) => (
+                            <tr key={result.table} className="hover:bg-muted/30">
+                              <td className="p-3 sticky left-0 bg-background z-10">
+                                <div className="flex items-center gap-2">
+                                  <TableIcon className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  <span className="font-mono text-sm whitespace-nowrap">{result.table}</span>
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-start gap-2 group">
+                                  <div className="font-mono text-xs text-muted-foreground break-all break-words flex-1 min-w-0 max-w-full">
+                                    <span className="whitespace-pre-wrap">{result.sourceChecksum || "N/A"}</span>
+                                  </div>
+                                  {result.sourceChecksum && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                      onClick={() => copyToClipboard(result.sourceChecksum || "")}
+                                      title="Copy checksum"
+                                    >
+                                      <CopyIcon className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-start gap-2 group">
+                                  <div className="font-mono text-xs text-muted-foreground break-all break-words flex-1 min-w-0 max-w-full">
+                                    <span className="whitespace-pre-wrap">{result.targetChecksum || "N/A"}</span>
+                                  </div>
+                                  {result.targetChecksum && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                      onClick={() => copyToClipboard(result.targetChecksum || "")}
+                                      title="Copy checksum"
+                                    >
+                                      <CopyIcon className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="p-3 text-center">
+                                <Badge variant="outline">{result.algorithm}</Badge>
+                              </td>
+                              <td className="p-3 text-center">
+                                {result.status === "error" ? (
+                                  <Badge variant="destructive">Error</Badge>
+                                ) : result.match ? (
+                                  <Badge className="bg-success/20 text-success border-0">Valid</Badge>
+                                ) : (
+                                  <Badge variant="destructive">Invalid</Badge>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -328,7 +540,16 @@ export function DataValidationPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {dryRunResults.map((result) => (
+                {dryRunResults.length === 0 ? (
+                  <Card className="border-dashed">
+                    <CardContent className="pt-6 text-center text-muted-foreground">
+                      {loading ? "Loading..." : "No dry-run results. Click 'Run Validation' to start."}
+                    </CardContent>
+                  </Card>
+                ) : (
+                  dryRunResults
+                    .filter(r => !searchTerm || r.table.toLowerCase().includes(searchTerm.toLowerCase()))
+                    .map((result) => (
                   <Card key={result.table} className="border-border/50">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
@@ -363,9 +584,11 @@ export function DataValidationPage() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                    ))
+                )}
 
-                <Card className="bg-muted/30 border-dashed">
+                {dryRunResults.length > 0 && (
+                  <Card className="bg-muted/30 border-dashed">
                   <CardContent className="pt-6">
                     <div className="grid grid-cols-4 gap-4 text-center">
                       <div>
@@ -389,6 +612,7 @@ export function DataValidationPage() {
                     </div>
                   </CardContent>
                 </Card>
+                )}
               </div>
             </CardContent>
           </Card>

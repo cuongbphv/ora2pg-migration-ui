@@ -365,6 +365,53 @@ class ApiService {
 
     return { data: true };
   }
+
+  // Data Validation
+  async compareRowCounts(projectId: string, tableNames?: string[]) {
+    return this.request('/validation/row-count/' + projectId, {
+      method: 'POST',
+      body: JSON.stringify({ tableNames: tableNames || null }),
+    });
+  }
+
+  async compareChecksums(projectId: string, options?: {
+    tableNames?: string[];
+    algorithm?: string;
+    columnsToInclude?: string[];
+  }) {
+    return this.request('/validation/checksum/' + projectId, {
+      method: 'POST',
+      body: JSON.stringify({
+        tableNames: options?.tableNames || null,
+        algorithm: options?.algorithm || 'MD5',
+        columnsToInclude: options?.columnsToInclude || null,
+      }),
+    });
+  }
+
+  async performDryRun(projectId: string, tableNames?: string[]) {
+    return this.request('/validation/dry-run/' + projectId, {
+      method: 'POST',
+      body: JSON.stringify({ tableNames: tableNames || null }),
+    });
+  }
+
+  async runAllValidations(projectId: string, options?: {
+    tableNames?: string[];
+    algorithm?: string;
+    columnsToInclude?: string[];
+    includeDryRun?: boolean;
+  }) {
+    return this.request('/validation/all/' + projectId, {
+      method: 'POST',
+      body: JSON.stringify({
+        tableNames: options?.tableNames || null,
+        checksumAlgorithm: options?.algorithm || 'MD5',
+        columnsToInclude: options?.columnsToInclude || null,
+        includeDryRun: options?.includeDryRun !== false,
+      }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

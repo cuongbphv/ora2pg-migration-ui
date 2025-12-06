@@ -179,7 +179,7 @@ function MainContent() {
         )
       // Roadmap pages
       case "validation":
-        return <DataValidationPage />
+        return <DataValidationPage projectId={selectedProjectId || ""} project={selectedProject || undefined} />
       case "schema":
         return <SchemaMigrationPage />
       case "scheduler":
